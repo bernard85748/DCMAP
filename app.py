@@ -16,12 +16,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- CSS (Mobile Optimierung & Design) ---
+# --- CSS (Design & Mobile Optimierung) ---
 st.markdown("""
     <style>
     .block-container { padding: 0rem; }
     header { visibility: visible !important; }
     
+    /* Badge oben rechts für die Trefferanzahl */
     .found-badge {
         position: fixed;
         top: 60px;
@@ -35,6 +36,7 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
     
+    /* Styling für die Legende in der Sidebar */
     .sidebar-legend {
         background-color: rgba(255, 255, 255, 0.05);
         padding: 12px;
@@ -44,6 +46,7 @@ st.markdown("""
         border: 1px solid #444;
     }
     
+    /* Sidebar-Button (Pfeil) sichtbar machen */
     button[kind="header"] {
         background-color: rgba(255, 255, 255, 0.9) !important;
         border-radius: 50% !important;
@@ -52,9 +55,13 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
-    if power_kw < 200: color, count = "#3b82f6", 1 
-    elif 200 <= power_kw <= 300: color, count = "#ef4444", 2 
-    else: color, count = "#000000", 3 
+    # Farb-Logik identisch zur Legende
+    if power_kw < 200: 
+        color, count = "#3b82f6", 1 # Blau
+    elif 200 <= power_kw <= 300: 
+        color, count = "#ef4444", 2 # Rot
+    else: 
+        color, count = "#000000", 3 # Schwarz
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
     icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 1px;"></i>' for _ in range(count)])
@@ -67,7 +74,7 @@ def get_lightning_html(power_kw, status_color):
         icon_size=(60, 40), icon_anchor=(30, 20)
     )
 
-# --- SIDEBAR MIT FARBIGEN BLITZEN ---
+# --- SIDEBAR ---
 st.sidebar.title("🚀 Zielsuche")
 search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. Berlin", key="city_input")
 
@@ -76,21 +83,21 @@ st.sidebar.title("⚙️ DC-Leistung")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# Die Legende nutzt jetzt die exakten Farben der Karten-Marker
+# Legende mit farblich passenden Blitzen
 st.sidebar.markdown("""
 <div class="sidebar-legend">
     <strong>Blitze (Leistung):</strong><br>
-    <div style="display: flex; align-items: center; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
         <span style="color:#3b82f6; font-size: 20px;">⚡</span> 
-        <span>&lt; 200 kW (HPC)</span>
+        <span>&lt; 200 kW</span>
     </div>
-    <div style="display: flex; align-items: center; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
         <span style="color:#ef4444; font-size: 20px;">⚡⚡</span> 
-        <span>200 - 300 kW (Ultra)</span>
+        <span>200 - 300 kW</span>
     </div>
-    <div style="display: flex; align-items: center; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
         <span style="color:#000000; font-size: 20px;">⚡⚡⚡</span> 
-        <span>&gt; 300 kW (Hyper)</span>
+        <span>&gt; 300 kW</span>
     </div>
     <hr style="margin: 12px 0; border-color: #444;">
     <strong>Status (Punkt):</strong><br>
@@ -133,7 +140,7 @@ folium.Circle([final_lat, final_lon], radius=range_km*1000, color="green", fill=
 found_count = 0
 if API_KEY:
     try:
-        # API Abfrage mit Leistungspuffer
+        # API Abfrage mit Puffer, um ungenaue Einträge zu finden
         params = {
             "key": API_KEY, "latitude": final_lat, "longitude": final_lon, 
             "distance": range_km, "distanceunit": "KM", "maxresults": 250, 
@@ -143,7 +150,7 @@ if API_KEY:
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
         
         for poi in res:
-            # 1. Leistung & Stecker prüfen
+            # 1. Leistung & Stecker sicher prüfen
             conns = poi.get('Connections', [])
             max_site_pwr = 0
             total_chargers = 0
@@ -155,7 +162,7 @@ if API_KEY:
             
             if max_site_pwr < min_power: continue
             
-            # 2. Betreiber sicher abfragen (Fix für NoneType Error)
+            # 2. Betreiber sicher abfragen (Fix für lückenhafte Daten)
             op_info = poi.get('OperatorInfo')
             op_name = op_info.get('Title', "Unbekannt") if op_info else "Unbekannt"
             
@@ -185,9 +192,8 @@ if API_KEY:
     except Exception as e:
         st.sidebar.error(f"API Fehler: {e}")
 
-# Treffer-Badge
+# Treffer-Anzeige oben rechts
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_safe", use_container_width=True)
-
+st_folium(m, height=800, width=None, key="dc_final_safe_version", use_container_width=True)
