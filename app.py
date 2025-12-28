@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- CSS (Design & Mobile Optimierung) ---
+# --- CSS (Mobile Optimierung & Design) ---
 st.markdown("""
     <style>
     .block-container { padding: 0rem; }
@@ -52,10 +52,9 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
-    # Farb- und Symbollogik für die Blitze
-    if power_kw < 200: color, count = "#3b82f6", 1 # Blau
-    elif 200 <= power_kw <= 300: color, count = "#ef4444", 2 # Rot
-    else: color, count = "#000000", 3 # Schwarz
+    if power_kw < 200: color, count = "#3b82f6", 1 
+    elif 200 <= power_kw <= 300: color, count = "#ef4444", 2 
+    else: color, count = "#000000", 3 
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
     icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 1px;"></i>' for _ in range(count)])
@@ -70,14 +69,13 @@ def get_lightning_html(power_kw, status_color):
 
 # --- SIDEBAR ---
 st.sidebar.title("🚀 Zielsuche")
-search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München", key="city_input")
+search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. Berlin", key="city_input")
 
 st.sidebar.divider()
 st.sidebar.title("⚙️ DC-Leistung") 
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# Legende in der Sidebar
 st.sidebar.markdown("""
 <div class="sidebar-legend">
     <strong>Blitze (Leistung):</strong><br>
@@ -100,7 +98,7 @@ cons = st.sidebar.slider("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, 0.5)
 
 range_km = int((battery * (soc / 100)) / cons * 100)
 
-# --- STANDORT & API ---
+# --- STANDORT & API LOGIK ---
 default_lat, default_lon = 50.1109, 8.6821 
 target_lat, target_lon = None, None
 
@@ -112,7 +110,8 @@ if search_city:
 
 if not target_lat:
     loc = get_geolocation()
-    if loc: target_lat, target_lon = loc['coords']['latitude'], loc['coords']['longitude']
+    if loc and loc.get('coords'): 
+        target_lat, target_lon = loc['coords']['latitude'], loc['coords']['longitude']
 
 final_lat = target_lat if target_lat else default_lat
 final_lon = target_lon if target_lon else default_lon
@@ -124,7 +123,7 @@ folium.Circle([final_lat, final_lon], radius=range_km*1000, color="green", fill=
 found_count = 0
 if API_KEY:
     try:
-        # Optimierte API-Anfrage mit Puffer
+        # API Abfrage mit Leistungspuffer
         params = {
             "key": API_KEY, "latitude": final_lat, "longitude": final_lon, 
             "distance": range_km, "distanceunit": "KM", "maxresults": 250, 
@@ -134,31 +133,41 @@ if API_KEY:
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
         
         for poi in res:
+            # 1. Leistung & Stecker prüfen
             conns = poi.get('Connections', [])
             max_site_pwr = 0
             total_chargers = 0
             for c in conns:
-                p = float(c.get('PowerKW', 0) or 0)
-                if p > max_site_pwr: max_site_pwr = p
-                total_chargers += int(c.get('Quantity', 1) or 1)
+                if c:
+                    p = float(c.get('PowerKW', 0) or 0)
+                    if p > max_site_pwr: max_site_pwr = p
+                    total_chargers += int(c.get('Quantity', 1) or 1)
             
-            # Präzise Filterung im Code
             if max_site_pwr < min_power: continue
             
-            op_name = poi.get('OperatorInfo', {}).get('Title', "Unbekannt")
+            # 2. Betreiber sicher abfragen (Fix für NoneType Error)
+            op_info = poi.get('OperatorInfo')
+            op_name = op_info.get('Title', "Unbekannt") if op_info else "Unbekannt"
+            
             if hide_tesla and "tesla" in op_name.lower(): continue
             
+            # 3. Status & Koordinaten
             s_id = int(poi.get('StatusTypeID', 0) or 0)
             s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
-            lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
             
-            g_maps = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
-            a_maps = f"http://maps.apple.com/?q={lat},{lon}"
+            addr = poi.get('AddressInfo', {})
+            lat, lon = addr.get('Latitude'), addr.get('Longitude')
+            if lat is None or lon is None: continue
+            
+            # 4. Popup & Marker
+            g_maps = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
+            a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
             
             pop_html = f'''<div style="width:200px;font-family:sans-serif;">
-                            <b>{op_name}</b><br>{int(max_site_pwr)} kW | {total_chargers} Stecker<br><br>
-                            <a href="{g_maps}" target="_blank" style="background:#4285F4;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;margin-bottom:5px;">Google Maps</a>
-                            <a href="{a_maps}" target="_blank" style="background:black;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;">Apple Maps</a>
+                            <b style="font-size:14px;">{op_name}</b><br>
+                            <span style="font-size:12px;">{int(max_site_pwr)} kW | {total_chargers} Stecker</span><br><br>
+                            <a href="{g_maps}" target="_blank" style="background:#4285F4;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;margin-bottom:8px;font-weight:bold;">Google Maps</a>
+                            <a href="{a_maps}" target="_blank" style="background:black;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;font-weight:bold;">Apple Maps</a>
                            </div>'''
             
             folium.Marker([lat, lon], icon=get_lightning_html(max_site_pwr, s_color), popup=folium.Popup(pop_html, max_width=250)).add_to(m)
@@ -166,8 +175,8 @@ if API_KEY:
     except Exception as e:
         st.sidebar.error(f"API Fehler: {e}")
 
-# Anzeige der gefundenen Stationen
+# Treffer-Badge
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_v2", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_safe", use_container_width=True)
