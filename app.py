@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- CSS (Badge oben rechts) ---
+# --- CSS (Design & Mobile Optimierung) ---
 st.markdown("""
     <style>
     .block-container { padding: 0rem; }
@@ -32,26 +32,34 @@ st.markdown("""
         border-radius: 10px;
         z-index: 9999;
         font-weight: bold;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
     
     .sidebar-legend {
         background-color: rgba(255, 255, 255, 0.05);
-        padding: 10px;
+        padding: 12px;
         border-radius: 8px;
         font-size: 14px;
         line-height: 1.6;
+        border: 1px solid #444;
+    }
+    
+    button[kind="header"] {
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        border-radius: 50% !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
-    if power_kw < 200: color, count = "#3b82f6", 1 
-    elif 200 <= power_kw <= 300: color, count = "#ef4444", 2 
-    else: color, count = "#000000", 3 
+    # Farb- und Symbollogik für die Blitze
+    if power_kw < 200: color, count = "#3b82f6", 1 # Blau
+    elif 200 <= power_kw <= 300: color, count = "#ef4444", 2 # Rot
+    else: color, count = "#000000", 3 # Schwarz
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
     icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 1px;"></i>' for _ in range(count)])
+    
     return DivIcon(
         html=f"""<div style="display: flex; flex-direction: column; align-items: center; width: 60px;">
                     <div style="background-color: {status_color}; border-radius: 50%; width: 14px; height: 14px; border: 2px solid white; {glow}"></div>
@@ -61,24 +69,23 @@ def get_lightning_html(power_kw, status_color):
     )
 
 # --- SIDEBAR ---
-st.sidebar.title("🚀 Filter")
-search_city = st.sidebar.text_input("Zielstadt", placeholder="Suchen...", key="city_input")
+st.sidebar.title("🚀 Zielsuche")
+search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München", key="city_input")
 
 st.sidebar.divider()
-st.sidebar.title("⚙️ DC-Ladeleistung") 
+st.sidebar.title("⚙️ DC-Leistung") 
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
-
-# NEUE LOGIK: Tesla ausschließen statt einschließen
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
+# Legende in der Sidebar
 st.sidebar.markdown("""
 <div class="sidebar-legend">
-    <strong>Symbole & Leistung:</strong><br>
+    <strong>Blitze (Leistung):</strong><br>
     <span style="color:#3b82f6;">⚡</span> < 200 kW<br>
     <span style="color:#ef4444;">⚡⚡</span> 200 - 300 kW<br>
     <span style="color:#000;">⚡⚡⚡</span> > 300 kW<br>
     <hr style="margin: 8px 0; border-color: #444;">
-    <strong>Status:</strong><br>
+    <strong>Status (Punkt):</strong><br>
     <span style="color:#00FF00;">●</span> Verfügbar<br>
     <span style="color:#FF0000;">●</span> Belegt / Defekt<br>
     <span style="color:#A9A9A9;">●</span> Unbekannt
@@ -86,9 +93,9 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 st.sidebar.divider()
-st.sidebar.title("🔋 BEV-Reichweitenradius")
+st.sidebar.title("🔋 Reichweite")
 battery = st.sidebar.slider("Batterie (kWh)", 10, 150, 75)
-soc = st.sidebar.slider("Akku (%)", 0, 100, 40)
+soc = st.sidebar.slider("Aktueller Stand (%)", 0, 100, 40)
 cons = st.sidebar.slider("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, 0.5)
 
 range_km = int((battery * (soc / 100)) / cons * 100)
@@ -96,11 +103,13 @@ range_km = int((battery * (soc / 100)) / cons * 100)
 # --- STANDORT & API ---
 default_lat, default_lon = 50.1109, 8.6821 
 target_lat, target_lon = None, None
+
 if search_city:
     try:
-        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'DC-Finder-V21'}).json()
+        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'DC-Finder-Final'}).json()
         if geo: target_lat, target_lon = float(geo[0]['lat']), float(geo[0]['lon'])
     except: pass
+
 if not target_lat:
     loc = get_geolocation()
     if loc: target_lat, target_lon = loc['coords']['latitude'], loc['coords']['longitude']
@@ -115,35 +124,25 @@ folium.Circle([final_lat, final_lon], radius=range_km*1000, color="green", fill=
 found_count = 0
 if API_KEY:
     try:
-        params = {"key": API_KEY, "latitude": final_lat, "longitude": final_lon, "distance": range_km, "distanceunit": "KM", "maxresults": 250, "compact": "false", "minpowerkw": min_power, "connectiontypeid": "33,30"}
+        # Optimierte API-Anfrage mit Puffer
+        params = {
+            "key": API_KEY, "latitude": final_lat, "longitude": final_lon, 
+            "distance": range_km, "distanceunit": "KM", "maxresults": 250, 
+            "compact": "false", "minpowerkw": max(0, min_power - 10),
+            "connectiontypeid": "33,30"
+        }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
+        
         for poi in res:
             conns = poi.get('Connections', [])
-            pwr, total_chargers = 0, 0
+            max_site_pwr = 0
+            total_chargers = 0
             for c in conns:
-                c_pwr = float(c.get('PowerKW', 0) or 0)
-                if c_pwr > pwr: pwr = c_pwr
+                p = float(c.get('PowerKW', 0) or 0)
+                if p > max_site_pwr: max_site_pwr = p
                 total_chargers += int(c.get('Quantity', 1) or 1)
             
-            if pwr < min_power: continue
+            # Präzise Filterung im Code
+            if max_site_pwr < min_power: continue
             
-            op_name = poi.get('OperatorInfo', {}).get('Title', "Unbekannt")
-            
-            # --- FILTER-LOGIK ---
-            # Wenn 'hide_tesla' aktiv ist, überspringen wir alle POIs, die 'tesla' im Namen haben
-            if hide_tesla and "tesla" in op_name.lower():
-                continue
-
-            s_id = int(poi.get('StatusTypeID', 0) or 0)
-            s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
-            lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
-            g_maps, a_maps = f"http://maps.google.com/?q={lat},{lon}", f"http://maps.apple.com/?q={lat},{lon}"
-            pop_html = f'<div style="width:200px;font-family:sans-serif;"><b>{op_name}</b><br>{int(pwr)} kW | {total_chargers} Stecker<br><br><a href="{g_maps}" target="_blank" style="background:#4285F4;color:white;padding:8px;text-decoration:none;border-radius:4px;display:block;text-align:center;margin-bottom:5px;">Google Maps</a><a href="{a_maps}" target="_blank" style="background:black;color:white;padding:8px;text-decoration:none;border-radius:4px;display:block;text-align:center;">Apple Maps</a></div>'
-            folium.Marker([lat, lon], icon=get_lightning_html(pwr, s_color), popup=folium.Popup(pop_html, max_width=250)).add_to(m)
-            found_count += 1
-    except: pass
-
-if found_count > 0:
-    st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
-
-st_folium(m, height=800, width=None, key="dc_final_filter_logic", use_container_width=True)
+            op_name = poi.get
