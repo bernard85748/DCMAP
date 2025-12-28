@@ -9,7 +9,6 @@ from folium.features import DivIcon
 st.set_page_config(page_title="EV Ultra Finder Pro", layout="wide", page_icon="⚡")
 
 def get_lightning_html(power_kw, status_color):
-    """Erzeugt das Blitz-Icon basierend auf der Ladeleistung."""
     if 50 <= power_kw < 200:
         color, count = "blue", 1
     elif 200 <= power_kw <= 300:
@@ -30,84 +29,69 @@ def get_lightning_html(power_kw, status_color):
 
 # --- SIDEBAR: NAVIGATION & FILTER ---
 st.sidebar.title("🌍 Reiseplanung")
-search_city = st.sidebar.text_input("Stadt suchen (z.B. Paris, Wien, Berlin)", "")
+search_city = st.sidebar.text_input("Stadt suchen", "")
 
 st.sidebar.title("⚙️ Filter")
-
-# Länder Auswahl (Europa)
 country_options = {
     "Deutschland": "DE", "Österreich": "AT", "Schweiz": "CH", 
     "Frankreich": "FR", "Italien": "IT", "Spanien": "ES", 
-    "Niederlande": "NL", "Dänemark": "DK", "Norwegen": "NO", 
-    "Schweden": "SE", "Belgien": "BE", "UK": "GB"
+    "Niederlande": "NL", "Dänemark": "DK", "Norwegen": "NO"
 }
-selected_countries = st.sidebar.multiselect(
-    "Länder auswählen",
-    options=list(country_options.keys()),
-    default=["Deutschland"]
-)
+selected_countries = st.sidebar.multiselect("Länder", options=list(country_options.keys()), default=["Deutschland"])
 
-# Steckertyp Filter
-connector_options = {
-    "CCS (Schnelllader)": 33,
-    "CHAdeMO": 2,
-    "Type 2 (AC)": 25,
-    "Tesla (Supercharger)": 30
-}
-selected_connectors = st.sidebar.multiselect(
-    "Steckertypen",
-    options=list(connector_options.keys()),
-    default=["CCS (Schnelllader)", "Tesla (Supercharger)"]
-)
+connector_options = {"CCS": 33, "CHAdeMO": 2, "Type 2": 25, "Tesla": 30}
+selected_connectors = st.sidebar.multiselect("Stecker", options=list(connector_options.keys()), default=["CCS", "Tesla"])
 
-# Anbieter Filter
-selected_operators = st.sidebar.multiselect(
-    "Bevorzugte Anbieter",
-    ["Tesla", "EnBW", "Ionity", "Aral Pulse", "Fastned", "EWE Go", "Alle"],
-    default=["Alle"]
-)
-
+selected_operators = st.sidebar.multiselect("Anbieter", ["Tesla", "EnBW", "Ionity", "Aral Pulse", "Fastned", "Alle"], default=["Alle"])
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 350, 150)
-search_radius = st.sidebar.slider("Suchradius (km)", 10, 1000, 100)
+search_radius = st.sidebar.slider("Radius (km)", 10, 1000, 100)
 
 st.title("⚡ EV Pro Finder")
-
-# API Key aus den Streamlit Secrets laden
 API_KEY = st.secrets.get("OCM_API_KEY", None)
 
-# --- STANDORT-LOGIK ---
+# --- STANDORT ---
 target_lat, target_lon = None, None
-
 if search_city:
     geo_url = f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}"
     try:
         geo_res = requests.get(geo_url, headers={'User-Agent': 'EV-Finder-App'}).json()
         if geo_res:
             target_lat, target_lon = float(geo_res[0]['lat']), float(geo_res[0]['lon'])
-            st.success(f"📍 Ergebnisse für {search_city}")
-    except:
-        st.error("Fehler bei der Stadtsuche.")
+    except: st.error("Fehler bei Stadtsuche.")
 else:
     loc = get_geolocation()
     if loc:
         target_lat, target_lon = loc['coords']['latitude'], loc['coords']['longitude']
 
-# --- KARTE UND DATEN ---
+# --- KARTE ---
 if target_lat and target_lon:
-    # Dynamische Zoom-Stufe
-    zoom = 11 if search_radius < 50 else (8 if search_radius < 150 else 6)
-    m = folium.Map(location=[target_lat, target_lon], zoom_start=zoom, tiles="cartodbpositron")
-    folium.Marker([target_lat, target_lon], popup="Zentrum", icon=folium.Icon(color='blue', icon='star')).add_to(m)
-
+    m = folium.Map(location=[target_lat, target_lon], zoom_start=8, tiles="cartodbpositron")
     if API_KEY:
-        # Parameter vorbereiten
         c_codes = [country_options[name] for name in selected_countries]
-        country_param = ",".join(c_codes) if c_codes else ""
+        conn_ids = [connector_options[name] for name in selected_connectors]
         
-        connector_ids = [connector_options[name] for name in selected_connectors]
-        conn_param = ",".join(map(str, connector_ids)) if connector_ids else ""
-        
-        # API URL (maxresults auf 1000 für Europa-Suche)
         url = f"https://api.openchargemap.io/v3/poi/?key={API_KEY}&latitude={target_lat}&longitude={target_lon}&distance={search_radius}&maxresults=1000&compact=true"
+        if c_codes: url += f"&countrycode={','.join(c_codes)}"
+        if conn_ids: url += f"&connectiontypeid={','.join(map(str, conn_ids))}"
         
-        if country_param: url += f"&countrycode
+        try:
+            data = requests.get(url).json()
+            for poi in data:
+                try:
+                    p_lat, p_lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
+                    power = max([c.get('PowerKW', 0) for c in poi.get('Connections', []) if c.get('PowerKW')], default=0)
+                    if power < min_power: continue
+                    
+                    op_title = poi.get('OperatorInfo', {}).get('Title', 'Unbekannt')
+                    if "Alle" not in selected_operators and not any(op.lower() in op_title.lower() for op in selected_operators):
+                        continue
+
+                    s_id = int(poi.get('StatusTypeID', 0))
+                    s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
+                    
+                    folium.Marker([p_lat, p_lon], icon=get_lightning_html(power, s_color)).add_to(m)
+                except: continue
+        except: st.error("API-Fehler.")
+    st_folium(m, width="100%", height=600)
+else:
+    st.info("Bitte Standort freigeben oder Stadt suchen.")
