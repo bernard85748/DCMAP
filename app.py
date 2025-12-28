@@ -67,7 +67,7 @@ def get_lightning_html(power_kw, status_color):
         icon_size=(60, 40), icon_anchor=(30, 20)
     )
 
-# --- SIDEBAR ---
+# --- SIDEBAR MIT FARBIGEN BLITZEN ---
 st.sidebar.title("🚀 Zielsuche")
 search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. Berlin", key="city_input")
 
@@ -76,13 +76,23 @@ st.sidebar.title("⚙️ DC-Leistung")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
+# Die Legende nutzt jetzt die exakten Farben der Karten-Marker
 st.sidebar.markdown("""
 <div class="sidebar-legend">
     <strong>Blitze (Leistung):</strong><br>
-    <span style="color:#3b82f6;">⚡</span> < 200 kW<br>
-    <span style="color:#ef4444;">⚡⚡</span> 200 - 300 kW<br>
-    <span style="color:#000;">⚡⚡⚡</span> > 300 kW<br>
-    <hr style="margin: 8px 0; border-color: #444;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="color:#3b82f6; font-size: 20px;">⚡</span> 
+        <span>&lt; 200 kW (HPC)</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="color:#ef4444; font-size: 20px;">⚡⚡</span> 
+        <span>200 - 300 kW (Ultra)</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="color:#000000; font-size: 20px;">⚡⚡⚡</span> 
+        <span>&gt; 300 kW (Hyper)</span>
+    </div>
+    <hr style="margin: 12px 0; border-color: #444;">
     <strong>Status (Punkt):</strong><br>
     <span style="color:#00FF00;">●</span> Verfügbar<br>
     <span style="color:#FF0000;">●</span> Belegt / Defekt<br>
@@ -180,3 +190,4 @@ if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
 st_folium(m, height=800, width=None, key="dc_final_safe", use_container_width=True)
+
