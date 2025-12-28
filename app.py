@@ -82,10 +82,12 @@ if target_lat and target_lon:
 
     if API_KEY:
         params = {
-            "key": API_KEY,
-            "latitude": target_lat,
-            "longitude": target_lon,
-            "distance": search_radius,
-            "distanceunit": "KM",
-            "maxresults": 500,
-            "compact": "false", # Wichtig für volle Betreiber-Infos
+    "key": API_KEY,
+    "latitude": target_lat,
+    "longitude": target_lon,
+    "distance": search_radius,
+    "distanceunit": "KM",
+    "maxresults": 500,
+    "compact": "false",
+    "verbose": "false"
+}
