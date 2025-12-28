@@ -6,7 +6,7 @@ from streamlit_js_eval import get_geolocation
 from folium.features import DivIcon
 
 # --- SETUP ---
-st.set_page_config(page_title="EV DC-Only Finder", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="EV DC-Master Pro", layout="wide", page_icon="⚡")
 API_KEY = st.secrets.get("OCM_API_KEY", None)
 
 def get_lightning_html(power_kw, status_color):
@@ -29,21 +29,21 @@ def get_lightning_html(power_kw, status_color):
     )
 
 # --- SIDEBAR ---
-st.sidebar.title("🚀 DC Schnelllade-Suche")
-search_city = st.sidebar.text_input("Stadt suchen", key="city_input")
+st.sidebar.title("🚀 DC-Spezialsuche")
+search_city = st.sidebar.text_input("Zielstadt suchen", key="city_input")
 
 st.sidebar.divider()
 st.sidebar.title("🔋 Reichweite")
 battery = st.sidebar.number_input("Batterie (kWh)", 10, 150, 75, step=1)
 soc = st.sidebar.slider("Akku %", 0, 100, 40)
-cons = st.sidebar.number_input("Verbrauch (kWh/100km)", 10, 40, 20, step=1)
+cons = st.sidebar.number_input("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, step=0.5)
 range_km = int((battery * (soc / 100)) / cons * 100)
 st.sidebar.metric("Reichweite", f"{range_km} km")
 
 st.sidebar.divider()
-st.sidebar.title("⚙️ DC-Filter")
+st.sidebar.title("⚙️ Filter")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
-search_radius = st.sidebar.slider("Suchradius (km)", 10, 500, 150)
+search_radius = st.sidebar.slider("Radius (km)", 10, 500, 150)
 only_tesla = st.sidebar.checkbox("Nur Tesla Supercharger")
 
 # --- STANDORT ---
@@ -52,7 +52,7 @@ target_lat, target_lon = None, None
 
 if search_city:
     try:
-        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-DC'}).json()
+        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V7'}).json()
         if geo: target_lat, target_lon = float(geo[0]['lat']), float(geo[0]['lon'])
     except: pass
 
@@ -63,8 +63,8 @@ if not target_lat:
 final_lat = target_lat if target_lat else default_lat
 final_lon = target_lon if target_lon else default_lon
 
-# --- HAUPTTEIL ---
-st.title("⚡ EV DC-Only Finder")
+# --- KARTE ---
+st.title("⚡ EV DC-Master Pro")
 
 m = folium.Map(location=[final_lat, final_lon], zoom_start=8, tiles="cartodbpositron")
 folium.Circle([final_lat, final_lon], radius=range_km*1000, color="green", fill=True, fill_opacity=0.1).add_to(m)
@@ -80,7 +80,7 @@ if API_KEY:
             "maxresults": 500,
             "compact": "false",
             "minpowerkw": min_power,
-            "connectiontypeid": "33,30,2", # STRENGER FILTER: CCS, Tesla, CHAdeMO (alles DC)
+            "connectiontypeid": "33,30", # Nur CCS & Tesla DC
             "verbose": "false"
         }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
@@ -88,27 +88,36 @@ if API_KEY:
         found_count = 0
         for poi in res:
             conns = poi.get('Connections', [])
-            all_pwr = [float(c.get('PowerKW', 0)) for c in conns if c.get('PowerKW')]
-            pwr = max(all_pwr, default=0)
             
-            # Sicherheitscheck, falls API doch ein AC-Kabel mitsendet
+            # Höchste Leistung und Anzahl der Ladepunkte berechnen
+            pwr = 0
+            total_chargers = 0
+            for c in conns:
+                c_pwr = float(c.get('PowerKW', 0) or 0)
+                if c_pwr > pwr: pwr = c_pwr
+                # Menge der Stecker addieren
+                total_chargers += int(c.get('Quantity', 1) or 1)
+
             if pwr < min_power: continue
             
             op_info = poi.get('OperatorInfo')
             op_name = op_info.get('Title') if op_info else "Unbekannter Betreiber"
             if only_tesla and "tesla" not in op_name.lower(): continue
 
-            s_id = int(poi.get('StatusTypeID', 0))
+            s_id = int(poi.get('StatusTypeID', 0) or 0)
             s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
             
             lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
             nav_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
             
+            # Informativeres Popup
             pop_html = f"""
-            <div style="font-family: Arial; width: 180px;">
-                <b>{op_name}</b><br>
-                Leistung: <b>{int(pwr)} kW</b><br><br>
-                <a href="{nav_url}" target="_blank" style="background-color: #2196F3; color: white; padding: 8px; text-decoration: none; border-radius: 4px; display: block; text-align: center;">🚀 Navigieren</a>
+            <div style="font-family: 'Segoe UI', Arial; width: 200px; line-height: 1.4;">
+                <b style="font-size: 14px; color: #333;">{op_name}</b><br>
+                <hr style="margin: 5px 0; border: 0; border-top: 1px solid #eee;">
+                Leistung: <span style="color: #d32f2f; font-weight: bold;">{int(pwr)} kW</span><br>
+                Ladepunkte: <b>{total_chargers} Stecker</b><br><br>
+                <a href="{nav_url}" target="_blank" style="background-color: #1a73e8; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; display: block; text-align: center; font-weight: bold;">📍 Navigation</a>
             </div>
             """
             
@@ -119,8 +128,8 @@ if API_KEY:
             ).add_to(m)
             found_count += 1
         
-        st.sidebar.success(f"Gefunden: {found_count} DC-Standorte")
+        st.sidebar.success(f"Gefunden: {found_count} DC-Parks")
     except Exception as e:
-        st.sidebar.error(f"API Fehler: {e}")
+        st.sidebar.error(f"Datenfehler: {e}")
 
-st_folium(m, height=600, width=None, key="dc_map_final")
+st_folium(m, height=600, width=None, key="dc_final_v3")
