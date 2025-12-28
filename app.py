@@ -30,13 +30,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
-    # BLITZ-LOGIK (Rollback)
+    # LÜCKENLOSE LOGIK (Punkt 2 Rollback + Fix)
     if power_kw <= 200:
-        color, count = "#3b82f6", 1
+        color, count = "#3b82f6", 1  # Blau: Alles bis inkl. 200
     elif power_kw < 350:
-        color, count = "#ef4444", 2
+        color, count = "#ef4444", 2  # Rot: 201 bis 349
     else:
-        color, count = "#000000", 3
+        color, count = "#000000", 3  # Schwarz: ab 350
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
     icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 0 1px;"></i>' for _ in range(count)])
@@ -59,8 +59,7 @@ search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München
 
 st.sidebar.divider()
 st.sidebar.title("🔌 DC-Leistung")
-# WICHTIG: min_power wird jetzt lokal im Code gefiltert, nicht in der API-Anfrage
-min_power = st.sidebar.slider("Mindestleistung (kW)", 20, 400, 50) 
+min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
 # --- LEGENDE ---
@@ -95,20 +94,18 @@ if current_lat:
     folium.Marker([current_lat, current_lon], icon=folium.Icon(color='blue', icon='user', prefix='fa')).add_to(m)
     folium.Circle([current_lat, current_lon], radius=range_km*1000, color="blue", fill=True, fill_opacity=0.05).add_to(m)
 
-# --- DATEN (Punkt 3: API liefert alles ab 20kW, App filtert den Rest) ---
+# --- DATEN (Punkt 3: API liefert alle DC-Daten, App filtert) ---
 found_count = 0
 if API_KEY:
     try:
         params = {
             "key": API_KEY, 
-            "latitude": final_lat, 
-            "longitude": final_lon, 
+            "latitude": final_lat, "longitude": final_lon, 
             "distance": range_km if range_km > 0 else 50, 
             "distanceunit": "KM", 
             "maxresults": 250, 
             "compact": "false", 
-            "connectiontypeid": "33,30",
-            "minpowerkw": 20 # API liefert alles ab 20kW, damit wir blaue Säulen sehen
+            "connectiontypeid": "33,30" # CCS & CHAdeMO
         }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
         
@@ -120,7 +117,7 @@ if API_KEY:
                 if p > max_pwr: max_pwr = p
                 qty += int(c.get('Quantity', 1) or 1)
             
-            # HIER passiert die Filterung basierend auf deinem Slider:
+            # Wichtig: Hier greift dein Mindestleistung-Slider
             if max_pwr < min_power: continue
             
             op_name = poi.get('OperatorInfo', {}).get('Title', "Unbekannt")
@@ -144,4 +141,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, use_container_width=True, key="dc_final_blue_fix")
+st_folium(m, height=800, width=None, use_container_width=True, key="dc_final_fix_v5")
