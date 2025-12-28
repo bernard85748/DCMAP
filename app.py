@@ -22,7 +22,7 @@ st.markdown("""
     .block-container { padding: 0rem; }
     header { visibility: visible !important; }
     
-    /* Badge oben rechts für die Trefferanzahl */
+    /* Treffer-Badge oben rechts */
     .found-badge {
         position: fixed;
         top: 60px;
@@ -46,7 +46,7 @@ st.markdown("""
         border: 1px solid #444;
     }
     
-    /* Sidebar-Button (Pfeil) sichtbar machen */
+    /* Sidebar-Pfeil besser sichtbar machen */
     button[kind="header"] {
         background-color: rgba(255, 255, 255, 0.9) !important;
         border-radius: 50% !important;
@@ -55,16 +55,19 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
-    # Farb-Logik identisch zur Legende
-    if power_kw < 200: 
-        color, count = "#3b82f6", 1 # Blau
-    elif 200 <= power_kw <= 300: 
-        color, count = "#ef4444", 2 # Rot
+    # Logik: 1 Blau (bis 200), 2 Rot (bis 349), 3 Schwarz (ab 350)
+    if power_kw <= 200: 
+        color, count = "#3b82f6", 1 
+    elif 200 < power_kw < 350: 
+        color, count = "#ef4444", 2 
     else: 
-        color, count = "#000000", 3 # Schwarz
+        color, count = "#000000", 3 
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
-    icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 1px;"></i>' for _ in range(count)])
+    # Schwarze Blitze bekommen einen weißen Rand für Sichtbarkeit auf der Karte
+    text_style = "text-shadow: 0 0 3px white;" if color == "#000000" else ""
+    
+    icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 1px; {text_style}"></i>' for _ in range(count)])
     
     return DivIcon(
         html=f"""<div style="display: flex; flex-direction: column; align-items: center; width: 60px;">
@@ -76,34 +79,43 @@ def get_lightning_html(power_kw, status_color):
 
 # --- SIDEBAR ---
 st.sidebar.title("🚀 Zielsuche")
-search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. Berlin", key="city_input")
+search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München", key="city_input")
 
 st.sidebar.divider()
 st.sidebar.title("⚙️ DC-Leistung") 
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# Legende mit farblich passenden Blitzen
+# Legende mit farblich identischen Blitzen zur Karte
 st.sidebar.markdown("""
 <div class="sidebar-legend">
     <strong>Blitze (Leistung):</strong><br>
     <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
         <span style="color:#3b82f6; font-size: 20px;">⚡</span> 
-        <span>&lt; 200 kW</span>
+        <span>50 - 200 kW</span>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
         <span style="color:#ef4444; font-size: 20px;">⚡⚡</span> 
-        <span>200 - 300 kW</span>
+        <span>201 - 349 kW</span>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="color:#000000; font-size: 20px;">⚡⚡⚡</span> 
-        <span>&gt; 300 kW</span>
+        <span style="color:#000000; font-size: 20px; text-shadow: 0 0 2px white, 0 0 5px white;">⚡⚡⚡</span> 
+        <span style="font-weight: bold;">≥ 350 kW</span>
     </div>
     <hr style="margin: 12px 0; border-color: #444;">
     <strong>Status (Punkt):</strong><br>
-    <span style="color:#00FF00;">●</span> Verfügbar<br>
-    <span style="color:#FF0000;">●</span> Belegt / Defekt<br>
-    <span style="color:#A9A9A9;">●</span> Unbekannt
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="color:#00FF00; filter: drop-shadow(0 0 2px #00FF00);">●</span> 
+        <span>Verfügbar</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="color:#FF0000; filter: drop-shadow(0 0 2px #FF0000);">●</span> 
+        <span>Belegt / Defekt</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="color:#A9A9A9;">●</span> 
+        <span>Unbekannt</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -115,7 +127,7 @@ cons = st.sidebar.slider("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, 0.5)
 
 range_km = int((battery * (soc / 100)) / cons * 100)
 
-# --- STANDORT & API LOGIK ---
+# --- STANDORT & API ---
 default_lat, default_lon = 50.1109, 8.6821 
 target_lat, target_lon = None, None
 
@@ -140,7 +152,6 @@ folium.Circle([final_lat, final_lon], radius=range_km*1000, color="green", fill=
 found_count = 0
 if API_KEY:
     try:
-        # API Abfrage mit Puffer, um ungenaue Einträge zu finden
         params = {
             "key": API_KEY, "latitude": final_lat, "longitude": final_lon, 
             "distance": range_km, "distanceunit": "KM", "maxresults": 250, 
@@ -150,7 +161,6 @@ if API_KEY:
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
         
         for poi in res:
-            # 1. Leistung & Stecker sicher prüfen
             conns = poi.get('Connections', [])
             max_site_pwr = 0
             total_chargers = 0
@@ -162,13 +172,10 @@ if API_KEY:
             
             if max_site_pwr < min_power: continue
             
-            # 2. Betreiber sicher abfragen (Fix für lückenhafte Daten)
             op_info = poi.get('OperatorInfo')
             op_name = op_info.get('Title', "Unbekannt") if op_info else "Unbekannt"
-            
             if hide_tesla and "tesla" in op_name.lower(): continue
             
-            # 3. Status & Koordinaten
             s_id = int(poi.get('StatusTypeID', 0) or 0)
             s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
             
@@ -176,7 +183,6 @@ if API_KEY:
             lat, lon = addr.get('Latitude'), addr.get('Longitude')
             if lat is None or lon is None: continue
             
-            # 4. Popup & Marker
             g_maps = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
             a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
             
@@ -192,8 +198,7 @@ if API_KEY:
     except Exception as e:
         st.sidebar.error(f"API Fehler: {e}")
 
-# Treffer-Anzeige oben rechts
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_safe_version", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_colored_legend", use_container_width=True)
