@@ -52,7 +52,7 @@ target_lat, target_lon = None, None
 
 if search_city:
     try:
-        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V13'}).json()
+        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V14'}).json()
         if geo: target_lat, target_lon = float(geo[0]['lat']), float(geo[0]['lon'])
     except: pass
 
@@ -95,24 +95,13 @@ if API_KEY:
                 if c_pwr > pwr: pwr = c_pwr
                 total_chargers += int(c.get('Quantity', 1) or 1)
 
-            if pwr < min_power: 
+            if pwr < min_power:
                 continue
             
             op_info = poi.get('OperatorInfo')
             op_name = op_info.get('Title') if op_info else "Unbekannter Betreiber"
-            if only_tesla and "tesla" not in op_name.lower(): 
+            if only_tesla and "tesla" not in op_name.lower():
                 continue
 
             s_id = int(poi.get('StatusTypeID', 0) or 0)
-            s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
-            
-            lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
-            nav_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
-            
-            pop_html = f"""
-            <div style="font-family: 'Segoe UI', Arial; width: 200px; line-height: 1.4;">
-                <b style="font-size: 14px; color: #333;">{op_name}</b><br>
-                <hr style="margin: 5px 0; border: 0; border-top: 1px solid #eee;">
-                Leistung: <span style="color: #d32f2f; font-weight: bold;">{int(pwr)} kW</span><br>
-                Ladepunkte: <b>{total_chargers} Stecker</b><br><br>
-                <a href="{nav_url}" target="_blank" style="background-color: #1a73e8; color: white
+            s_color = "#00FF00" if s_id in [10, 15, 50] else
