@@ -34,11 +34,15 @@ search_city = st.sidebar.text_input("Zielstadt suchen", key="city_input")
 
 st.sidebar.divider()
 st.sidebar.title("🔋 Reichweite")
-battery = st.sidebar.number_input("Batterie (kWh)", 10, 150, 75, step=1)
-soc = st.sidebar.slider("Akku %", 0, 100, 40)
-cons = st.sidebar.number_input("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, step=0.5)
+
+# NEU: Batterie und Verbrauch als Schieberegler
+battery = st.sidebar.slider("Batterie Kapazität (kWh)", min_value=10, max_value=150, value=75, step=1)
+soc = st.sidebar.slider("Aktueller Akku (%)", 0, 100, 40)
+cons = st.sidebar.slider("Verbrauch (kWh/100km)", min_value=10.0, max_value=40.0, value=20.0, step=0.5)
+
+# Berechnung
 range_km = int((battery * (soc / 100)) / cons * 100)
-st.sidebar.metric("Reichweite", f"{range_km} km")
+st.sidebar.metric("Berechnete Reichweite", f"{range_km} km")
 
 st.sidebar.divider()
 st.sidebar.title("⚙️ Filter")
@@ -52,7 +56,7 @@ target_lat, target_lon = None, None
 
 if search_city:
     try:
-        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V7'}).json()
+        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V8'}).json()
         if geo: target_lat, target_lon = float(geo[0]['lat']), float(geo[0]['lon'])
     except: pass
 
@@ -80,7 +84,7 @@ if API_KEY:
             "maxresults": 500,
             "compact": "false",
             "minpowerkw": min_power,
-            "connectiontypeid": "33,30", # Nur CCS & Tesla DC
+            "connectiontypeid": "33,30", 
             "verbose": "false"
         }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
@@ -88,14 +92,11 @@ if API_KEY:
         found_count = 0
         for poi in res:
             conns = poi.get('Connections', [])
-            
-            # Höchste Leistung und Anzahl der Ladepunkte berechnen
             pwr = 0
             total_chargers = 0
             for c in conns:
                 c_pwr = float(c.get('PowerKW', 0) or 0)
                 if c_pwr > pwr: pwr = c_pwr
-                # Menge der Stecker addieren
                 total_chargers += int(c.get('Quantity', 1) or 1)
 
             if pwr < min_power: continue
@@ -110,7 +111,6 @@ if API_KEY:
             lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
             nav_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
             
-            # Informativeres Popup
             pop_html = f"""
             <div style="font-family: 'Segoe UI', Arial; width: 200px; line-height: 1.4;">
                 <b style="font-size: 14px; color: #333;">{op_name}</b><br>
@@ -132,4 +132,4 @@ if API_KEY:
     except Exception as e:
         st.sidebar.error(f"Datenfehler: {e}")
 
-st_folium(m, height=600, width=None, key="dc_final_v3")
+st_folium(m, height=600, width=None, key="dc_final_v4")
