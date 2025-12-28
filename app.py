@@ -16,37 +16,35 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# CSS für Fullscreen + sichtbaren Sidebar-Button
+# CSS für maximalen Kontrast und Lesbarkeit auf dem Smartphone
 st.markdown("""
     <style>
-    /* Den Abstand oben lassen wir minimal, damit der Button sichtbar bleibt */
-    .block-container { 
-        padding-top: 1rem; 
-        padding-bottom: 0rem;
-    }
+    .block-container { padding-top: 0rem; padding-bottom: 0rem; }
+    header { visibility: visible !important; }
     
-    header { visibility: visible !important; opacity: 0.5; } /* Macht den Header leicht sichtbar */
-    
-    /* Falls der Standard-Button nicht reicht, hier ein Hinweis-Pfeil */
-    [data-testid="stSidebarNav"] {
-        background-color: rgba(255, 255, 255, 0.8);
-        border-radius: 0 10px 10px 0;
-    }
-
-    /* Schwebende Badge oben rechts (wie gehabt) */
+    /* Kontraststarke Badge oben rechts */
     .found-badge {
         position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: rgba(255, 255, 255, 0.9);
-        padding: 5px 12px;
-        border-radius: 20px;
-        border: 1px solid #ccc;
-        font-family: sans-serif;
-        font-size: 14px;
-        font-weight: bold;
-        z-index: 1000;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        top: 15px;
+        right: 15px;
+        background-color: #222222; /* Dunkler Hintergrund */
+        color: #ffffff !important;  /* Reinweiße Schrift */
+        padding: 8px 15px;
+        border-radius: 10px;
+        border: 2px solid #444;
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 16px;            /* Etwas größer für Mobile */
+        font-weight: 800;           /* Extra fett */
+        z-index: 1001;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        pointer-events: none;       /* Klicks gehen durch auf die Karte */
+    }
+
+    /* Sidebar-Button (Pfeil) besser sichtbar machen */
+    button[kind="header"] {
+        background-color: rgba(255, 255, 255, 0.8) !important;
+        border-radius: 50% !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -128,4 +126,5 @@ if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
 st_folium(m, height=800, width=None, key="dc_final_full", use_container_width=True)
+
 
