@@ -16,39 +16,43 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- CSS (Design & Icons) ---
+# --- CSS FIX (Verhindert Text-Ausgabe oben) ---
 st.markdown("""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
-    .block-container { padding: 0rem; }
-    header { visibility: visible !important; }
-    
-    .found-badge {
-        position: fixed;
-        top: 60px;
-        right: 10px;
-        background-color: #222222;
-        color: white !important;
-        padding: 8px 12px;
-        border-radius: 10px;
-        z-index: 9999;
-        font-weight: bold;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-    }
-    
-    .sidebar-legend {
-        background-color: rgba(255, 255, 255, 0.05);
-        padding: 12px;
-        border-radius: 8px;
-        font-size: 14px;
-        line-height: 1.6;
-        border: 1px solid #444;
-    }
-    
-    button[kind="header"] {
-        background-color: rgba(255, 255, 255, 0.9) !important;
-        border-radius: 50% !important;
-    }
+        /* Versteckt potenziellen Text-Overspill und optimiert Layout */
+        .block-container { padding: 0rem !important; }
+        header { visibility: visible !important; }
+        
+        /* Treffer-Badge oben rechts */
+        .found-badge {
+            position: fixed;
+            top: 60px;
+            right: 10px;
+            background-color: #222222;
+            color: white !important;
+            padding: 8px 12px;
+            border-radius: 10px;
+            z-index: 9999;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        
+        /* Legende Styling */
+        .sidebar-legend {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+            border: 1px solid #444;
+        }
+        
+        /* Sidebar Button Fix */
+        button[kind="header"] {
+            background-color: rgba(255, 255, 255, 0.9) !important;
+            border-radius: 50% !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -184,7 +188,6 @@ if API_KEY:
             g_maps = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
             a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
             
-            # NEUE ANORDNUNG: Zeile 1 = Leistung, Zeile 2 = Betreiber
             pop_html = f'''<div style="width:200px; font-family:sans-serif; color: black;">
                             <b style="font-size:16px;">{int(max_site_pwr)} kW</b> 
                             <span style="font-size:14px;">({total_chargers} Stecker)</span><br>
@@ -201,4 +204,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_v7_popup_swap", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_v8_textfix", use_container_width=True)
