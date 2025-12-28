@@ -52,7 +52,7 @@ target_lat, target_lon = None, None
 
 if search_city:
     try:
-        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V14'}).json()
+        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V15'}).json()
         if geo: target_lat, target_lon = float(geo[0]['lat']), float(geo[0]['lon'])
     except: pass
 
@@ -103,5 +103,37 @@ if API_KEY:
             if only_tesla and "tesla" not in op_name.lower():
                 continue
 
+            # Status Bestimmung (sauber strukturiert)
             s_id = int(poi.get('StatusTypeID', 0) or 0)
-            s_color = "#00FF00" if s_id in [10, 15, 50] else
+            if s_id in [10, 15, 50]:
+                s_color = "#00FF00" # Grün (Verfügbar)
+            elif s_id in [20, 30, 75]:
+                s_color = "#FF0000" # Rot (Belegt/Defekt)
+            else:
+                s_color = "#A9A9A9" # Grau (Unbekannt)
+            
+            lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
+            nav_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
+            
+            pop_html = f"""
+            <div style="font-family: 'Segoe UI', Arial; width: 200px; line-height: 1.4;">
+                <b style="font-size: 14px; color: #333;">{op_name}</b><br>
+                <hr style="margin: 5px 0; border: 0; border-top: 1px solid #eee;">
+                Leistung: <span style="color: #d32f2f; font-weight: bold;">{int(pwr)} kW</span><br>
+                Ladepunkte: <b>{total_chargers} Stecker</b><br><br>
+                <a href="{nav_url}" target="_blank" style="background-color: #1a73e8; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; display: block; text-align: center; font-weight: bold;">📍 Navigation</a>
+            </div>
+            """
+            
+            folium.Marker(
+                [lat, lon],
+                icon=get_lightning_html(pwr, s_color),
+                popup=folium.Popup(pop_html, max_width=250)
+            ).add_to(m)
+            found_count += 1
+        
+        st.sidebar.success(f"Gefunden: {found_count} DC-Parks")
+    except Exception as e:
+        st.sidebar.error(f"Datenfehler: {e}")
+
+st_folium(m, height=600, width=None, key="dc_final_v12")
