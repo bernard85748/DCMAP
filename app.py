@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- CSS & FONTAWESOME ---
+# --- CSS ---
 st.markdown("""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
@@ -57,14 +57,14 @@ def get_lightning_html(power_kw, status_color):
         icon_size=(60, 40), icon_anchor=(30, 20)
     )
 
-# --- STANDORT-LOGIK ---
+# --- STANDORT ---
 loc = get_geolocation()
 current_lat, current_lon = None, None
 if loc and loc.get('coords'):
     current_lat = loc['coords']['latitude']
     current_lon = loc['coords']['longitude']
 
-# --- SIDEBAR: FILTER ---
+# --- SIDEBAR ---
 st.sidebar.title("🚀 Zielsuche")
 search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München", key="city_input")
 
@@ -73,7 +73,7 @@ st.sidebar.title("🔌 DC Ladesäule")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# --- LEGENDE ALS VARIABLE (Stabilisiert) ---
+# --- LEGENDE ---
 legende_html = f'''
 <div style="background-color: #f0f0f0; padding: 15px; border-radius: 10px; border: 1px solid #ccc; color: #000000; font-family: sans-serif;">
     <strong style="font-size: 14px;">Blitze (Leistung):</strong><br>
@@ -111,7 +111,7 @@ legende_html = f'''
 st.sidebar.markdown(legende_html, unsafe_allow_html=True)
 
 st.sidebar.divider()
-st.sidebar.title("🔋 Reichweitenradius")
+st.sidebar.title("🔋 Reichweite")
 battery = st.sidebar.slider("Batterie (kWh)", 10, 150, 75)
 soc = st.sidebar.slider("Aktueller SOC (%)", 0, 100, 20)
 cons = st.sidebar.slider("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, 0.5)
@@ -140,11 +140,20 @@ if current_lat and current_lon:
     folium.Marker([current_lat, current_lon], popup="Mein Standort", icon=folium.Icon(color='blue', icon='user', prefix='fa')).add_to(m)
     folium.Circle([current_lat, current_lon], radius=range_km*1000, color="blue", fill=True, fill_opacity=0.05).add_to(m)
 
-# --- DATEN LADEN (Spinner entfernt) ---
+# --- DATEN LADEN (Exakt im Radius) ---
 found_count = 0
 if API_KEY:
     try:
-        params = {"key": API_KEY, "latitude": final_lat, "longitude": final_lon, "distance": range_km, "distanceunit": "KM", "maxresults": 150, "compact": "false", "minpowerkw": min_power, "connectiontypeid": "33,30"}
+        params = {
+            "key": API_KEY, 
+            "latitude": final_lat, 
+            "longitude": final_lon, 
+            "distance": range_km, # Hier wird jetzt wieder exakt nach Reichweite gefiltert
+            "distanceunit": "KM", 
+            "maxresults": 250, # Erhöht, damit nichts verschluckt wird
+            "compact": "false", 
+            "connectiontypeid": "33,30"
+        }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
         
         for poi in res:
@@ -155,7 +164,9 @@ if API_KEY:
                 if p > max_pwr: max_pwr = p
                 qty += int(c.get('Quantity', 1) or 1)
             
+            # Erst hier filtern wir nach der eingestellten Mindestleistung
             if max_pwr < min_power: continue
+            
             op_name = poi.get('OperatorInfo', {}).get('Title', "Unbekannt")
             if hide_tesla and "tesla" in op_name.lower(): continue
             
@@ -181,4 +192,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_no_spinner", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_radius_fix", use_container_width=True)
