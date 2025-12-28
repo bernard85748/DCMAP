@@ -56,7 +56,7 @@ st.sidebar.title("🚀 Zielsuche")
 search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München")
 
 st.sidebar.divider()
-st.sidebar.title("🔌 DC Ladesäule")
+st.sidebar.title("🔌 DC Ladesäulen")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
@@ -68,7 +68,7 @@ legende_html = f'''
     <div style="margin-top:5px;"><i class="fa fa-bolt" style="color:#ef4444;"></i><i class="fa fa-bolt" style="color:#ef4444;"></i> 201-349 kW</div>
     <div style="margin-top:5px;"><i class="fa fa-bolt" style="color:#000;"></i><i class="fa fa-bolt" style="color:#000;"></i><i class="fa fa-bolt" style="color:#000;"></i> ≥350 kW</div>
     <hr style="margin: 10px 0; border-color: #bbb;">
-    <strong>Status:</strong> <span style="color:#00FF00;">●</span> Frei | <span style="color:#FF0000;">●</span> Belegt
+    <strong>Status:</strong> <span style="color:#00FF00;">●</span> bereit | <span style="color:#FF0000;">●</span> belegt
 </div>
 '''
 st.sidebar.markdown(legende_html, unsafe_allow_html=True)
@@ -147,3 +147,4 @@ if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
 st_folium(m, height=800, width=None, use_container_width=True, key="restore_v1")
+
