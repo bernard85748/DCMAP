@@ -61,10 +61,8 @@ def get_lightning_html(power_kw, status_color):
         color, count = "#000000", 3 
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
-    # Weißer Rand nur für schwarze Blitze auf der Karte
     text_shadow = "filter: drop-shadow(0 0 2px white);" if color == "#000000" else ""
     
-    # Nutzung von Font-Awesome Blitzen statt Emojis
     icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 0 1px; {text_shadow}"></i>' for _ in range(count)])
     
     return DivIcon(
@@ -84,7 +82,6 @@ st.sidebar.title("⚙️ DC-Leistung")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# Legende mit Font-Awesome Icons (keine Emojis mehr!)
 st.sidebar.markdown(f"""
 <div class="sidebar-legend">
     <strong>Blitze (Leistung):</strong><br>
@@ -111,7 +108,7 @@ st.sidebar.markdown(f"""
     <strong>Status (Punkt):</strong><br>
     <div style="display: flex; align-items: center; gap: 10px;">
         <span style="color:#00FF00; filter: drop-shadow(0 0 2px #00FF00);">●</span> 
-        <span>Verfügbar</span>
+        <span>Betriebsbereit</span>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
         <span style="color:#FF0000; filter: drop-shadow(0 0 2px #FF0000);">●</span> 
@@ -123,7 +120,7 @@ st.sidebar.markdown(f"""
 st.sidebar.divider()
 st.sidebar.title("🔋 Reichweite")
 battery = st.sidebar.slider("Batterie (kWh)", 10, 150, 75)
-soc = st.sidebar.slider("Aktueller Stand (%)", 0, 100, 40)
+soc = st.sidebar.slider("Aktueller SOC (%)", 0, 100, 20)
 cons = st.sidebar.slider("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, 0.5)
 
 range_km = int((battery * (soc / 100)) / cons * 100)
@@ -187,6 +184,7 @@ if API_KEY:
             g_maps = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
             a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
             
+            # HIER GEÄNDERT: Betreiber-Titel und Technik-Zeile getauscht
             pop_html = f'''<div style="width:200px;font-family:sans-serif;">
                             <b style="font-size:14px;">{op_name}</b><br>
                             <span style="font-size:12px;">{int(max_site_pwr)} kW | {total_chargers} Stecker</span><br><br>
@@ -202,4 +200,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_fa_icons", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_v5", use_container_width=True)
