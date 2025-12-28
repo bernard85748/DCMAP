@@ -56,12 +56,10 @@ current_lat, current_lon = (loc['coords']['latitude'], loc['coords']['longitude'
 # --- SIDEBAR ---
 st.sidebar.title("🚀 Zielsuche")
 search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München")
-# Radius jetzt direkt unter der Stadtsuche
-range_km = st.sidebar.slider("Suchradius (km)", 5, 250, 50)
 
 st.sidebar.divider()
 st.sidebar.title("🔌 DC-Leistung")
-min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 50)
+min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 50) # Auf 50kW gesenkt für blaue Marker
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
 # --- LEGENDE ---
@@ -75,6 +73,13 @@ st.sidebar.markdown("""
 <b>Status:</b> <span style="color:#00FF00;">●</span> Frei | <span style="color:#FF0000;">●</span> Belegt
 </div>
 """, unsafe_allow_html=True)
+
+st.sidebar.divider()
+st.sidebar.title("🔋 Suchradius") # Umbenannt von Reichweitenradius
+battery = st.sidebar.slider("Batterie (kWh)", 10, 150, 75)
+soc = st.sidebar.slider("Aktueller SOC (%)", 0, 100, 20)
+cons = st.sidebar.slider("Verbrauch", 10.0, 40.0, 20.0, 0.5)
+range_km = int((battery * (soc / 100)) / cons * 100)
 
 # --- ZENTRUM ---
 final_lat, final_lon = (current_lat, current_lon) if current_lat else (50.1109, 8.6821)
@@ -96,7 +101,7 @@ if API_KEY:
         params = {
             "key": API_KEY, 
             "latitude": final_lat, "longitude": final_lon, 
-            "distance": range_km, 
+            "distance": range_km if range_km > 0 else 50, 
             "distanceunit": "KM", 
             "maxresults": 250, 
             "compact": "false", 
@@ -135,4 +140,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, use_container_width=True, key="dc_final_sidebar_reorg")
+st_folium(m, height=800, width=None, use_container_width=True, key="dc_final_radius_rename")
