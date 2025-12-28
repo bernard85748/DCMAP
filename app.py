@@ -5,7 +5,7 @@ from streamlit_folium import st_folium
 from streamlit_js_eval import get_geolocation
 from folium.features import DivIcon
 
-# --- SETUP (Smartphone Optimiert: Sidebar standardmäßig zu) ---
+# --- SETUP (Smartphone Optimiert) ---
 st.set_page_config(
     page_title="DC Ladestationen", 
     layout="wide", 
@@ -13,13 +13,17 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# CSS für bessere Mobile-Ansicht (versteckt Streamlit-Header für mehr Platz)
+# CSS für Mobile-Optimierung
 st.markdown("""
     <style>
     .main > div { padding-top: 2rem; }
     iframe { width: 100% !important; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
+
+# --- API KEY SICHER LADEN ---
+# Versuche den Key aus den Secrets zu laden, sonst None
+API_KEY = st.secrets.get("OCM_API_KEY", None)
 
 def get_lightning_html(power_kw, status_color):
     if power_kw < 200:
@@ -34,15 +38,15 @@ def get_lightning_html(power_kw, status_color):
     
     return DivIcon(
         html=f"""<div style="display: flex; flex-direction: column; align-items: center; width: 60px;">
-                    <div style="background-color: {status_color}; border-radius: 50%; width: 16px; height: 16px; border: 2px solid white; {glow}"></div>
+                    <div style="background-color: {status_color}; border-radius: 50%; width: 16px; height: 14px; border: 2px solid white; {glow}"></div>
                     <div style="font-size: 24px; display: flex; justify-content: center; filter: drop-shadow(1px 1px 1px white);">{icons}</div>
                  </div>""",
         icon_size=(60, 40), icon_anchor=(30, 20)
     )
 
-# --- SIDEBAR (Wie gehabt, aber optimiert für Daumen-Slider) ---
+# --- SIDEBAR ---
 st.sidebar.title("🚀 Filter")
-search_city = st.sidebar.text_input("Zielstadt suchen", placeholder="z.B. Berlin", key="city_input")
+search_city = st.sidebar.text_input("Zielstadt suchen", placeholder="z.B. München", key="city_input")
 search_radius = st.sidebar.slider("Radius (km)", 10, 500, 150)
 
 st.sidebar.divider()
@@ -58,13 +62,13 @@ cons = st.sidebar.slider("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, 0.5)
 
 range_km = int((battery * (soc / 100)) / cons * 100)
 
-# --- STANDORT-LOGIK ---
+# --- STANDORT ---
 default_lat, default_lon = 50.1109, 8.6821 
 target_lat, target_lon = None, None
 
 if search_city:
     try:
-        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'DC-Finder-Mobile'}).json()
+        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'DC-Finder-V18'}).json()
         if geo: target_lat, target_lon = float(geo[0]['lat']), float(geo[0]['lon'])
     except: pass
 
@@ -75,26 +79,15 @@ if not target_lat:
 final_lat = target_lat if target_lat else default_lat
 final_lon = target_lon if target_lon else default_lon
 
-# --- HAUPTANSICHT ---
+# --- KARTE ---
 st.title("⚡ DC Ladestationen")
 
-# Karte mit Zoom-Buttons (wichtig für Mobile ohne Mausrad)
-m = folium.Map(
-    location=[final_lat, final_lon], 
-    zoom_start=9, 
-    tiles="cartodbpositron",
-    zoom_control=True
-)
+m = folium.Map(location=[final_lat, final_lon], zoom_start=9, tiles="cartodbpositron")
+folium.Circle([final_lat, final_lon], radius=range_km*1000, color="green", fill=True, fill_opacity=0.1).add_to(m)
 
-folium.Circle(
-    [final_lat, final_lon], 
-    radius=range_km*1000, 
-    color="green", 
-    fill=True, 
-    fill_opacity=0.1
-).add_to(m)
-
-if API_KEY:
+if not API_KEY:
+    st.sidebar.error("⚠️ API Key fehlt! Bitte in Streamlit Secrets 'OCM_API_KEY' hinterlegen.")
+else:
     try:
         params = {
             "key": API_KEY, "latitude": final_lat, "longitude": final_lon,
@@ -121,16 +114,22 @@ if API_KEY:
             s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
             
             lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
-            # Universal-Link: Öffnet auf iOS Apple Maps / Google Maps, auf Android Google Maps
-            nav_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
+            
+            # Nav-Links für beide Systeme
+            g_maps = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
+            a_maps = f"http://maps.apple.com/?q={lat},{lon}"
             
             pop_html = f"""
-            <div style="font-family: sans-serif; width: 220px; font-size: 16px;">
+            <div style="font-family: sans-serif; width: 220px; font-size: 15px;">
                 <b>{op_name}</b><br>
-                <div style="margin: 8px 0; color: #555;">
+                <div style="margin: 8px 0;">
                     🚀 <b>{int(pwr)} kW</b> | 🔌 {total_chargers} Stecker
                 </div>
-                <a href="{nav_url}" target="_blank" style="background-color: #1a73e8; color: white; padding: 12px; text-decoration: none; border-radius: 8px; display: block; text-align: center; font-weight: bold; font-size: 18px;">📍 Start Navigation</a>
+                <hr style="border: 0; border-top: 1px solid #eee;">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <a href="{g_maps}" target="_blank" style="background-color: #4285F4; color: white; padding: 10px; text-decoration: none; border-radius: 6px; text-align: center; font-weight: bold;">Google Maps</a>
+                    <a href="{a_maps}" target="_blank" style="background-color: #000; color: white; padding: 10px; text-decoration: none; border-radius: 6px; text-align: center; font-weight: bold;">Apple Maps</a>
+                </div>
             </div>
             """
             
@@ -140,8 +139,7 @@ if API_KEY:
                 popup=folium.Popup(pop_html, max_width=250)
             ).add_to(m)
             
-    except Exception:
-        st.sidebar.error("Fehler beim Laden")
+    except Exception as e:
+        st.sidebar.error(f"Fehler: {e}")
 
-# Die Karte wird auf dem Handy etwas höher (700px) dargestellt für bessere Übersicht
-st_folium(m, height=700, width=None, key="dc_mobile_final", use_container_width=True)
+st_folium(m, height=700, width=None, key="dc_final_v15", use_container_width=True)
