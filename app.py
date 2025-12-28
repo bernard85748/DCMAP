@@ -98,7 +98,7 @@ st.sidebar.markdown(f"""
             <i class="fa fa-bolt" style="color:#ef4444; font-size: 20px;"></i>
             <i class="fa fa-bolt" style="color:#ef4444; font-size: 20px;"></i>
         </span>
-        <span>201 - 349 kW</span>
+        <span>200 - 300 kW</span>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
         <span style="display: flex; gap: 2px;">
@@ -106,7 +106,7 @@ st.sidebar.markdown(f"""
             <i class="fa fa-bolt" style="color:#000000; font-size: 20px; filter: drop-shadow(0 0 1px white);"></i>
             <i class="fa fa-bolt" style="color:#000000; font-size: 20px; filter: drop-shadow(0 0 1px white);"></i>
         </span>
-        <span style="font-weight: bold;">≥ 350 kW</span>
+        <span style="font-weight: bold;">≥ 300 kW</span>
     </div>
     <hr style="margin: 12px 0; border-color: #444;">
     <strong>Status (Punkt):</strong><br>
@@ -205,3 +205,4 @@ if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
 st_folium(m, height=800, width=None, key="dc_final_v8_textfix", use_container_width=True)
+
