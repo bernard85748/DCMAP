@@ -30,9 +30,13 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
-    if power_kw <= 200: color, count = "#3b82f6", 1 
-    elif 200 < power_kw < 350: color, count = "#ef4444", 2 
-    else: color, count = "#000000", 3 
+    # KORRIGIERTE LOGIK FÜR DIE BLITZE
+    if power_kw < 201: 
+        color, count = "#3b82f6", 1 # Blau: bis 200kW
+    elif 201 <= power_kw < 350: 
+        color, count = "#ef4444", 2 # Rot: 201kW bis 349kW
+    else: 
+        color, count = "#000000", 3 # Schwarz: ab 350kW
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
     icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 0 1px;"></i>' for _ in range(count)])
@@ -56,7 +60,7 @@ st.sidebar.title("🚀 Zielsuche")
 search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München")
 
 st.sidebar.divider()
-st.sidebar.title("🔌 DC Ladesäulen")
+st.sidebar.title("🔌 DC Ladesäule")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
@@ -68,7 +72,7 @@ legende_html = f'''
     <div style="margin-top:5px;"><i class="fa fa-bolt" style="color:#ef4444;"></i><i class="fa fa-bolt" style="color:#ef4444;"></i> 201-349 kW</div>
     <div style="margin-top:5px;"><i class="fa fa-bolt" style="color:#000;"></i><i class="fa fa-bolt" style="color:#000;"></i><i class="fa fa-bolt" style="color:#000;"></i> ≥350 kW</div>
     <hr style="margin: 10px 0; border-color: #bbb;">
-    <strong>Status:</strong> <span style="color:#00FF00;">●</span> bereit | <span style="color:#FF0000;">●</span> belegt
+    <strong>Status:</strong> <span style="color:#00FF00;">●</span> Frei | <span style="color:#FF0000;">●</span> Belegt
 </div>
 '''
 st.sidebar.markdown(legende_html, unsafe_allow_html=True)
@@ -102,13 +106,12 @@ if current_lat:
 found_count = 0
 if API_KEY:
     try:
-        # Wir laden POIs im Umkreis der Reichweite (max. 250km)
         params = {
             "key": API_KEY, 
             "latitude": final_lat, "longitude": final_lon, 
             "distance": range_km, "distanceunit": "KM",
             "maxresults": 250, "compact": "false", "verbose": "false",
-            "connectiontypeid": "33,30" # CCS und CHAdeMO
+            "connectiontypeid": "33,30"
         }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
         
@@ -146,5 +149,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, use_container_width=True, key="restore_v1")
-
+st_folium(m, height=800, width=None, use_container_width=True, key="restore_final")
