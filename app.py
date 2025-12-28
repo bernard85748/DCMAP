@@ -37,12 +37,12 @@ country_options = {
     "Frankreich": "FR", "Italien": "IT", "Spanien": "ES", 
     "Niederlande": "NL", "Dänemark": "DK", "Norwegen": "NO"
 }
-selected_countries = st.sidebar.multiselect("Länder", options=list(country_options.keys()), default=["Deutschland"])
+selected_countries = st.sidebar.multiselect("Länder (leer lassen für alle)", options=list(country_options.keys()), default=["Deutschland"])
 
 connector_options = {"CCS": 33, "CHAdeMO": 2, "Type 2": 25, "Tesla": 30}
 selected_connectors = st.sidebar.multiselect("Stecker", options=list(connector_options.keys()), default=["CCS", "Tesla"])
 
-selected_operators = st.sidebar.multiselect("Anbieter", ["Tesla", "EnBW", "Ionity", "Aral Pulse", "Fastned", "Alle"], default=["Alle"])
+selected_operators = st.sidebar.multiselect("Anbieter", ["Tesla", "EnBW", "Ionity", "Aral Pulse", "Fastned", "EWE Go"], default=[])
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 350, 150)
 search_radius = st.sidebar.slider("Radius (km)", 10, 1000, 100)
 
@@ -66,32 +66,71 @@ else:
 # --- KARTE ---
 if target_lat and target_lon:
     m = folium.Map(location=[target_lat, target_lon], zoom_start=8, tiles="cartodbpositron")
+    
     if API_KEY:
-        c_codes = [country_options[name] for name in selected_countries]
-        conn_ids = [connector_options[name] for name in selected_connectors]
+        # Parameter dynamisch aufbauen
+        params = {
+            "key": API_KEY,
+            "latitude": target_lat,
+            "longitude": target_lon,
+            "distance": search_radius,
+            "maxresults": 500,
+            "compact": "true",
+            "verbose": "false"
+        }
         
-        url = f"https://api.openchargemap.io/v3/poi/?key={API_KEY}&latitude={target_lat}&longitude={target_lon}&distance={search_radius}&maxresults=1000&compact=true"
-        if c_codes: url += f"&countrycode={','.join(c_codes)}"
-        if conn_ids: url += f"&connectiontypeid={','.join(map(str, conn_ids))}"
+        if selected_countries:
+            params["countrycode"] = ",".join([country_options[c] for c in selected_countries])
+        
+        if selected_connectors:
+            params["connectiontypeid"] = ",".join([str(connector_options[c]) for c in selected_connectors])
         
         try:
-            data = requests.get(url).json()
+            response = requests.get("https://api.openchargemap.io/v3/poi/", params=params)
+            data = response.json()
+            
+            found_count = 0
             for poi in data:
                 try:
-                    p_lat, p_lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
-                    power = max([c.get('PowerKW', 0) for c in poi.get('Connections', []) if c.get('PowerKW')], default=0)
-                    if power < min_power: continue
+                    p_lat = poi['AddressInfo']['Latitude']
+                    p_lon = poi['AddressInfo']['Longitude']
                     
-                    op_title = poi.get('OperatorInfo', {}).get('Title', 'Unbekannt')
-                    if "Alle" not in selected_operators and not any(op.lower() in op_title.lower() for op in selected_operators):
+                    # Leistung prüfen
+                    conns = poi.get('Connections', [])
+                    power = max([c.get('PowerKW', 0) for c in conns if c.get('PowerKW')], default=0)
+                    if power < min_power:
                         continue
-
-                    s_id = int(poi.get('StatusTypeID', 0))
-                    s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
                     
-                    folium.Marker([p_lat, p_lon], icon=get_lightning_html(power, s_color)).add_to(m)
+                    # Anbieter prüfen
+                    op_title = poi.get('OperatorInfo', {}).get('Title', 'Unbekannt') or ""
+                    if selected_operators:
+                        if not any(op.lower() in op_title.lower() for op in selected_operators):
+                            continue
+
+                    # Status bestimmen
+                    s_id = int(poi.get('StatusTypeID', 0))
+                    if s_id in [10, 15, 50]: s_color, s_text = "#00FF00", "FREI"
+                    elif s_id in [20, 30, 75]: s_color, s_text = "#FF0000", "BELEGT"
+                    elif s_id in [100, 150, 200]: s_color, s_text = "#FFA500", "DEFEKT"
+                    else: s_color, s_text = "#A9A9A9", "KEINE DATEN"
+
+                    # Popup
+                    nav_url = f"https://www.google.com/maps/dir/?api=1&destination={p_lat},{p_lon}"
+                    html_popup = f"<b>{op_title}</b><br>{power} kW<br><a href='{nav_url}' target='_blank'>📍 Navigation</a>"
+                    
+                    folium.Marker(
+                        [p_lat, p_lon], 
+                        popup=folium.Popup(html_popup, max_width=200),
+                        icon=get_lightning_html(power, s_color)
+                    ).add_to(m)
+                    found_count += 1
                 except: continue
-        except: st.error("API-Fehler.")
-    st_folium(m, width="100%", height=600)
+            
+            st.sidebar.write(f"✅ {found_count} Ladeparks gefunden.")
+            
+        except Exception as e:
+            st.error(f"API Fehler: {e}")
+            
+    st_folium(m, width="100%", height=600, key="map")
 else:
     st.info("Bitte Standort freigeben oder Stadt suchen.")
