@@ -9,6 +9,7 @@ from folium.features import DivIcon
 st.set_page_config(page_title="EV Ultra Finder Pro", layout="wide", page_icon="⚡")
 
 def get_lightning_html(power_kw, status_color):
+    # Logik für Blitze: Blau (50-199kW), Rot (200-300kW), Schwarz (>300kW)
     if 50 <= power_kw < 200:
         color, count = "blue", 1
     elif 200 <= power_kw <= 300:
@@ -16,6 +17,7 @@ def get_lightning_html(power_kw, status_color):
     else:
         color, count = "black", 3
 
+    # Glow-Effekt nur bei echtem Status (Grün/Rot)
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color in ["#00FF00", "#FF0000"] else ""
     
     icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 1px;"></i>' for _ in range(count)])
@@ -31,6 +33,8 @@ def get_lightning_html(power_kw, status_color):
 st.sidebar.title("Filter & Optionen")
 show_only_live = st.sidebar.checkbox("Nur mit Live-Status (Grün/Rot)", value=False)
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 350, 150)
+# RADIUS auf 1000km erweitert
+search_radius = st.sidebar.slider("Suchradius (km)", 10, 1000, 100)
 
 st.title("⚡ EV Pro Finder")
 
@@ -39,11 +43,14 @@ loc = get_geolocation()
 
 if loc is not None:
     lat, lon = loc['coords']['latitude'], loc['coords']['longitude']
-    m = folium.Map(location=[lat, lon], zoom_start=12, tiles="cartodbpositron")
+    
+    # Karte erstellen
+    m = folium.Map(location=[lat, lon], zoom_start=8, tiles="cartodbpositron")
     folium.Marker([lat, lon], popup="Dein Standort", icon=folium.Icon(color='blue', icon='user', prefix='fa')).add_to(m)
 
     if API_KEY:
-        url = f"https://api.openchargemap.io/v3/poi/?key={API_KEY}&latitude={lat}&longitude={lon}&distance=40&countrycode=DE&maxresults=100"
+        # URL mit dynamischem Radius und erhöhtem maxresults für große Flächen
+        url = f"https://api.openchargemap.io/v3/poi/?key={API_KEY}&latitude={lat}&longitude={lon}&distance={search_radius}&countrycode=DE&maxresults=250"
         
         try:
             response = requests.get(url)
@@ -69,18 +76,16 @@ if loc is not None:
                         
                         betreiber = betreiber.split('(')[0].strip()
 
-                        # --- NEUE KORRIGIERTE STATUS-LOGIK ---
+                        # Status-Logik (Optimistisch)
                         status_id = int(poi.get('StatusTypeID', 0))
                         
-                        # Wir sind jetzt EXTREM vorsichtig mit 'Defekt'
-                        if status_id in [10, 15, 50]: # 50 wird oft als 'Operational' gemeldet
+                        if status_id in [10, 15, 50]:
                             s_color, s_text = "#00FF00", "VERFÜGBAR"
                         elif status_id in [20, 30, 75]:
                             s_color, s_text = "#FF0000", "BELEGT"
-                        elif status_id in [100, 150, 200, 210]: # Nur diese IDs sind sicher 'Defekt'
+                        elif status_id in [100, 150, 200, 210]:
                             s_color, s_text = "#FFA500", "DEFEKT"
                         else:
-                            # Alles andere wird GRAU (Status unbekannt)
                             s_color, s_text = "#A9A9A9", "KEINE LIVE-DATEN"
 
                         if show_only_live and s_color not in ["#00FF00", "#FF0000"]:
@@ -96,4 +101,4 @@ if loc is not None:
     
     st_folium(m, width="100%", height=650)
 else:
-    st.info("🌐 Suche Standort...")
+    st.info("🌐 Suche Standort... Bitte Freigabe im Browser bestätigen.")
