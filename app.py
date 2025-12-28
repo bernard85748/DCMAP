@@ -67,15 +67,17 @@ if loc is not None:
                     # Filter: Leistung
                     if power >= min_power:
                         
-                        # Betreiber-Name bestimmen
+                        # Betreiber-Name bestimmen (Fallback-System)
                         if poi.get('OperatorInfo') and poi['OperatorInfo'].get('Title'):
                             betreiber = poi['OperatorInfo']['Title']
+                        elif poi.get('AddressInfo') and poi['AddressInfo'].get('Title'):
+                            betreiber = poi['AddressInfo']['Title']
                         else:
-                            betreiber = poi['AddressInfo'].get('Title', 'Schnellladestation')
+                            betreiber = "Schnellladestation"
                         
                         betreiber = betreiber.split('(')[0].strip()
 
-                        # --- OPTIMIERTE STATUS-LOGIK ---
+                        # Status-Logik
                         status_id = int(poi.get('StatusTypeID', 0))
                         
                         if status_id in [10, 15]:
@@ -83,10 +85,25 @@ if loc is not None:
                         elif status_id in [20, 30, 75]:
                             s_color, s_text = "#FF0000", "BELEGT"
                         elif status_id in [50, 100, 150, 200]:
-                            s_color, s_text = "#FFA500", "DEFEKT / WARTUNG"
+                            s_color, s_text = "#FFA500", "DEFEKT"
                         else:
-                            s_color, s_text = "#A9A9A9", "STATUS UNBEKANNT"
+                            s_color, s_text = "#A9A9A9", "UNBEKANNT"
 
                         # Filter: Nur Live-Status anzeigen
                         if show_only_live and s_color not in ["#00FF00", "#FF0000"]:
                             continue
+
+                        folium.Marker(
+                            location=[p_lat, p_lon],
+                            popup=f"<b>{betreiber}</b><br>Leistung: {power} kW<br>Status: {s_text}",
+                            icon=get_lightning_html(power, s_color)
+                        ).add_to(m)
+                except:
+                    continue
+        except:
+            st.error("Fehler beim Abrufen der Daten.")
+    
+    # Karte in Streamlit anzeigen
+    st_folium(m, width="100%", height=650)
+else:
+    st.info("🌐 Suche Standort... Bitte Freigabe im Browser bestätigen.")
