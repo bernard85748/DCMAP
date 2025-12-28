@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- CSS FIX ---
+# --- CSS & FONTAWESOME (Wichtig für Icons und Design) ---
 st.markdown("""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
@@ -34,13 +34,9 @@ st.markdown("""
             font-weight: bold;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
-        .sidebar-legend {
-            background-color: rgba(255, 255, 255, 0.05);
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            line-height: 1.6;
-            border: 1px solid #444;
+        button[kind="header"] {
+            background-color: rgba(255, 255, 255, 0.9) !important;
+            border-radius: 50% !important;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -65,22 +61,59 @@ def get_lightning_html(power_kw, status_color):
         icon_size=(60, 40), icon_anchor=(30, 20)
     )
 
-# --- STANDORT-ABFRAGE ---
+# --- STANDORT-LOGIK ---
 loc = get_geolocation()
 current_lat, current_lon = None, None
 if loc and loc.get('coords'):
     current_lat = loc['coords']['latitude']
     current_lon = loc['coords']['longitude']
 
-# --- SIDEBAR & FILTER ---
+# --- SIDEBAR: FILTER ---
 st.sidebar.title("🚀 Zielsuche")
 search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München", key="city_input")
+
 st.sidebar.divider()
 st.sidebar.title("⚙️ DC-Leistung") 
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# --- REICHWEITE ---
+# --- SIDEBAR: LEGENDE (Repariert) ---
+st.sidebar.markdown("### 📊 Legende")
+st.sidebar.markdown(f"""
+<div style="background-color: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; border: 1px solid #444; color: white;">
+    <strong style="font-size: 14px;">Blitze (Leistung):</strong><br>
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+        <i class="fa fa-bolt" style="color:#3b82f6; font-size: 18px; width: 30px; text-align: center;"></i>
+        <span style="font-size: 13px;">50 - 200 kW</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+        <span style="width: 30px; text-align: center;">
+            <i class="fa fa-bolt" style="color:#ef4444; font-size: 18px;"></i>
+            <i class="fa fa-bolt" style="color:#ef4444; font-size: 18px;"></i>
+        </span>
+        <span style="font-size: 13px;">201 - 349 kW</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+        <span style="width: 30px; text-align: center;">
+            <i class="fa fa-bolt" style="color:#000000; font-size: 18px; filter: drop-shadow(0 0 1px white);"></i>
+            <i class="fa fa-bolt" style="color:#000000; font-size: 18px; filter: drop-shadow(0 0 1px white);"></i>
+            <i class="fa fa-bolt" style="color:#000000; font-size: 18px; filter: drop-shadow(0 0 1px white);"></i>
+        </span>
+        <span style="font-size: 13px; font-weight: bold;">≥ 350 kW</span>
+    </div>
+    <hr style="margin: 12px 0; border-color: #555;">
+    <strong style="font-size: 14px;">Status (Punkt):</strong><br>
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+        <span style="color:#00FF00; font-size: 20px; width: 30px; text-align: center;">●</span> 
+        <span style="font-size: 13px;">Betriebsbereit</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+        <span style="color:#FF0000; font-size: 20px; width: 30px; text-align: center;">●</span> 
+        <span style="font-size: 13px;">Belegt / Defekt</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 st.sidebar.divider()
 st.sidebar.title("🔋 Reichweite")
 battery = st.sidebar.slider("Batterie (kWh)", 10, 150, 75)
@@ -89,7 +122,7 @@ cons = st.sidebar.slider("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, 0.5)
 range_km = int((battery * (soc / 100)) / cons * 100)
 
 # --- ZENTRUM BESTIMMEN ---
-default_lat, default_lon = 50.1109, 8.6821 # Frankfurt
+default_lat, default_lon = 50.1109, 8.6821 
 target_lat, target_lon = None, None
 
 if search_city:
@@ -101,20 +134,19 @@ if search_city:
 final_lat = target_lat if target_lat else (current_lat if current_lat else default_lat)
 final_lon = target_lon if target_lon else (current_lon if current_lon else default_lon)
 
-# --- KARTE ERSTELLEN ---
+# --- KARTE ---
 m = folium.Map(location=[final_lat, final_lon], zoom_start=11, tiles="cartodbpositron", zoom_control=False)
 
-# Anzeige des Nutzers (Blauer Punkt)
+# Dein Standort (Blauer Punkt)
 if current_lat and current_lon:
     folium.Marker(
         [current_lat, current_lon],
-        popup="Dein Standort",
+        popup="Mein Standort",
         icon=folium.Icon(color='blue', icon='user', prefix='fa')
     ).add_to(m)
-    # Reichweiten-Kreis um den echten Standort
     folium.Circle([current_lat, current_lon], radius=range_km*1000, color="blue", fill=True, fill_opacity=0.05).add_to(m)
 
-# --- LADESTATIONEN LADEN ---
+# --- DATEN LADEN ---
 found_count = 0
 if API_KEY:
     try:
@@ -165,4 +197,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_v9_location", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_all_features", use_container_width=True)
