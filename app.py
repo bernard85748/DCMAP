@@ -73,7 +73,7 @@ st.sidebar.title("🔌 DC Ladesäule")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# --- LEGENDE ---
+# --- LEGENDE (Stabil) ---
 legende_html = f'''
 <div style="background-color: #f0f0f0; padding: 15px; border-radius: 10px; border: 1px solid #ccc; color: #000000; font-family: sans-serif;">
     <strong style="font-size: 14px;">Blitze (Leistung):</strong><br>
@@ -140,18 +140,20 @@ if current_lat and current_lon:
     folium.Marker([current_lat, current_lon], popup="Mein Standort", icon=folium.Icon(color='blue', icon='user', prefix='fa')).add_to(m)
     folium.Circle([current_lat, current_lon], radius=range_km*1000, color="blue", fill=True, fill_opacity=0.05).add_to(m)
 
-# --- DATEN LADEN (Exakt im Radius) ---
+# --- DATEN LADEN (Korrekt gefiltert) ---
 found_count = 0
 if API_KEY:
     try:
+        # Wir suchen gezielt nur innerhalb deiner Reichweite
         params = {
             "key": API_KEY, 
             "latitude": final_lat, 
             "longitude": final_lon, 
-            "distance": range_km, # Hier wird jetzt wieder exakt nach Reichweite gefiltert
+            "distance": range_km, 
             "distanceunit": "KM", 
-            "maxresults": 250, # Erhöht, damit nichts verschluckt wird
+            "maxresults": 100, 
             "compact": "false", 
+            "minpowerkw": min_power, 
             "connectiontypeid": "33,30"
         }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
@@ -164,9 +166,7 @@ if API_KEY:
                 if p > max_pwr: max_pwr = p
                 qty += int(c.get('Quantity', 1) or 1)
             
-            # Erst hier filtern wir nach der eingestellten Mindestleistung
             if max_pwr < min_power: continue
-            
             op_name = poi.get('OperatorInfo', {}).get('Title', "Unbekannt")
             if hide_tesla and "tesla" in op_name.lower(): continue
             
@@ -174,7 +174,7 @@ if API_KEY:
             s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
             lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
             
-            g_maps = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
+            g_maps = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
             a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
             
             pop_html = f'''<div style="width:200px; font-family:sans-serif; color:black;">
@@ -192,4 +192,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_radius_fix", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_restore", use_container_width=True)
