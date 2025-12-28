@@ -145,4 +145,29 @@ if API_KEY:
             # Präzise Filterung im Code
             if max_site_pwr < min_power: continue
             
-            op_name = poi.get
+            op_name = poi.get('OperatorInfo', {}).get('Title', "Unbekannt")
+            if hide_tesla and "tesla" in op_name.lower(): continue
+            
+            s_id = int(poi.get('StatusTypeID', 0) or 0)
+            s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
+            lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
+            
+            g_maps = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
+            a_maps = f"http://maps.apple.com/?q={lat},{lon}"
+            
+            pop_html = f'''<div style="width:200px;font-family:sans-serif;">
+                            <b>{op_name}</b><br>{int(max_site_pwr)} kW | {total_chargers} Stecker<br><br>
+                            <a href="{g_maps}" target="_blank" style="background:#4285F4;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;margin-bottom:5px;">Google Maps</a>
+                            <a href="{a_maps}" target="_blank" style="background:black;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;">Apple Maps</a>
+                           </div>'''
+            
+            folium.Marker([lat, lon], icon=get_lightning_html(max_site_pwr, s_color), popup=folium.Popup(pop_html, max_width=250)).add_to(m)
+            found_count += 1
+    except Exception as e:
+        st.sidebar.error(f"API Fehler: {e}")
+
+# Anzeige der gefundenen Stationen
+if found_count > 0:
+    st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
+
+st_folium(m, height=800, width=None, key="dc_final_v2", use_container_width=True)
