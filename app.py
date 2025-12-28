@@ -6,7 +6,6 @@ from streamlit_js_eval import get_geolocation
 from folium.features import DivIcon
 
 # --- API KEY LADEN ---
-# Stelle sicher, dass der Key in deinen Streamlit Secrets hinterlegt ist
 API_KEY = st.secrets.get("OCM_API_KEY", None)
 
 # --- SETUP ---
@@ -17,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- CSS & FONTAWESOME (Wichtig für Icons und Design) ---
+# --- CSS & FONTAWESOME ---
 st.markdown("""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
@@ -35,20 +34,16 @@ st.markdown("""
             font-weight: bold;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
-        button[kind="header"] {
-            background-color: rgba(255, 255, 255, 0.9) !important;
-            border-radius: 50% !important;
-        }
     </style>
     """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
     if power_kw <= 200: 
-        color, count = "#3b82f6", 1 
-    elif 200 < power_kw < 350: 
-        color, count = "#ef4444", 2 
+        color, count = "#3b82f6", 1 # Blau
+    elif power_kw < 350: 
+        color, count = "#ef4444", 2 # Rot
     else: 
-        color, count = "#000000", 3 
+        color, count = "#000000", 3 # Schwarz
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
     text_shadow = "filter: drop-shadow(0 0 2px white);" if color == "#000000" else ""
@@ -69,16 +64,17 @@ if loc and loc.get('coords'):
     current_lat = loc['coords']['latitude']
     current_lon = loc['coords']['longitude']
 
-# --- SIDEBAR: FILTER ---
+# --- SIDEBAR: ZIELSUCHE & RADIUS ---
 st.sidebar.title("🚀 Zielsuche")
 search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München", key="city_input")
+range_km = st.sidebar.slider("Suchradius (km)", 5, 250, 50)
 
 st.sidebar.divider()
 st.sidebar.title("⚙️ DC-Leistung") 
-min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
+min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 50)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# --- SIDEBAR: LEGENDE (Kein Titel, Text Schwarz auf Hellgrau) ---
+# --- SIDEBAR: LEGENDE ---
 st.sidebar.markdown(f"""
 <div style="background-color: rgba(240, 240, 240, 0.95); padding: 15px; border-radius: 10px; border: 1px solid #ccc; color: #000000;">
     <strong style="font-size: 14px;">Blitze (Leistung):</strong><br>
@@ -114,20 +110,13 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-st.sidebar.divider()
-st.sidebar.title("🔋 Reichweite")
-battery = st.sidebar.slider("Batterie (kWh)", 10, 150, 75)
-soc = st.sidebar.slider("Aktueller SOC (%)", 0, 100, 20)
-cons = st.sidebar.slider("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, 0.5)
-range_km = int((battery * (soc / 100)) / cons * 100)
-
 # --- ZENTRUM BESTIMMEN ---
 default_lat, default_lon = 50.1109, 8.6821 
 target_lat, target_lon = None, None
 
 if search_city:
     try:
-        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'DC-Finder-Final'}).json()
+        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'DC-Ladestationen-App'}).json()
         if geo: target_lat, target_lon = float(geo[0]['lat']), float(geo[0]['lon'])
     except: pass
 
@@ -137,13 +126,12 @@ final_lon = target_lon if target_lon else (current_lon if current_lon else defau
 # --- KARTE ---
 m = folium.Map(location=[final_lat, final_lon], zoom_start=11, tiles="cartodbpositron", zoom_control=False)
 
-# Eigener Standort (Blauer Marker)
 if current_lat and current_lon:
     folium.Marker(
         [current_lat, current_lon],
-        popup="Mein Standort",
         icon=folium.Icon(color='blue', icon='user', prefix='fa')
     ).add_to(m)
+    # Blauer Radius-Kreis zeigt jetzt direkt den Suchradius an
     folium.Circle([current_lat, current_lon], radius=range_km*1000, color="blue", fill=True, fill_opacity=0.05).add_to(m)
 
 # --- DATEN LADEN ---
@@ -153,8 +141,7 @@ if API_KEY:
         params = {
             "key": API_KEY, "latitude": final_lat, "longitude": final_lon, 
             "distance": range_km, "distanceunit": "KM", "maxresults": 200, 
-            "compact": "false", "minpowerkw": max(0, min_power - 10),
-            "connectiontypeid": "33,30"
+            "compact": "false", "connectiontypeid": "33,30"
         }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
         
@@ -178,10 +165,9 @@ if API_KEY:
             lat, lon = addr.get('Latitude'), addr.get('Longitude')
             
             if lat and lon:
-                g_maps = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
+                g_maps = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
                 a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
                 
-                # POPUP LAYOUT: Technik oben (mit Badge), Betreiber darunter
                 pop_html = f'''<div style="width:190px; font-family:sans-serif; color: black; line-height: 1.4;">
                                 <div style="margin-bottom: 4px;">
                                     <b style="font-size:18px;">{int(max_site_pwr)} kW</b>
@@ -190,7 +176,6 @@ if API_KEY:
                                     </span>
                                 </div>
                                 <div style="font-size:12px; color: #666; margin-bottom: 12px;">{op_name}</div>
-                                
                                 <a href="{g_maps}" target="_blank" style="background:#4285F4;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;margin-bottom:8px;font-weight:bold;font-size:13px;">Google Maps</a>
                                 <a href="{a_maps}" target="_blank" style="background:black;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;font-weight:bold;font-size:13px;">Apple Maps</a>
                                </div>'''
