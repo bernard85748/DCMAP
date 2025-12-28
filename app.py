@@ -6,6 +6,7 @@ from streamlit_js_eval import get_geolocation
 from folium.features import DivIcon
 
 # --- API KEY LADEN ---
+# Stelle sicher, dass der Key in deinen Streamlit Secrets hinterlegt ist
 API_KEY = st.secrets.get("OCM_API_KEY", None)
 
 # --- SETUP ---
@@ -77,10 +78,9 @@ st.sidebar.title("⚙️ DC-Leistung")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# --- SIDEBAR: LEGENDE (Repariert) ---
-st.sidebar.markdown("### 📊 Legende")
+# --- SIDEBAR: LEGENDE (Kein Titel, Text Schwarz auf Hellgrau) ---
 st.sidebar.markdown(f"""
-<div style="background-color: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; border: 1px solid #444; color: white;">
+<div style="background-color: rgba(240, 240, 240, 0.95); padding: 15px; border-radius: 10px; border: 1px solid #ccc; color: #000000;">
     <strong style="font-size: 14px;">Blitze (Leistung):</strong><br>
     <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
         <i class="fa fa-bolt" style="color:#3b82f6; font-size: 18px; width: 30px; text-align: center;"></i>
@@ -101,7 +101,7 @@ st.sidebar.markdown(f"""
         </span>
         <span style="font-size: 13px; font-weight: bold;">≥ 350 kW</span>
     </div>
-    <hr style="margin: 12px 0; border-color: #555;">
+    <hr style="margin: 12px 0; border-color: #bbb;">
     <strong style="font-size: 14px;">Status (Punkt):</strong><br>
     <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
         <span style="color:#00FF00; font-size: 20px; width: 30px; text-align: center;">●</span> 
@@ -137,7 +137,7 @@ final_lon = target_lon if target_lon else (current_lon if current_lon else defau
 # --- KARTE ---
 m = folium.Map(location=[final_lat, final_lon], zoom_start=11, tiles="cartodbpositron", zoom_control=False)
 
-# Dein Standort (Blauer Punkt)
+# Eigener Standort (Blauer Marker)
 if current_lat and current_lon:
     folium.Marker(
         [current_lat, current_lon],
@@ -181,12 +181,18 @@ if API_KEY:
                 g_maps = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
                 a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
                 
-                pop_html = f'''<div style="width:180px; font-family:sans-serif; color: black;">
-                                <b style="font-size:16px;">{int(max_site_pwr)} kW</b> 
-                                <span style="font-size:14px;">({total_chargers} Stecker)</span><br>
-                                <span style="font-size:12px; color: #666;">{op_name}</span><br><br>
-                                <a href="{g_maps}" target="_blank" style="background:#4285F4;color:white;padding:8px;text-decoration:none;border-radius:5px;display:block;text-align:center;margin-bottom:5px;font-weight:bold;">Google Maps</a>
-                                <a href="{a_maps}" target="_blank" style="background:black;color:white;padding:8px;text-decoration:none;border-radius:5px;display:block;text-align:center;font-weight:bold;">Apple Maps</a>
+                # POPUP LAYOUT: Technik oben (mit Badge), Betreiber darunter
+                pop_html = f'''<div style="width:190px; font-family:sans-serif; color: black; line-height: 1.4;">
+                                <div style="margin-bottom: 4px;">
+                                    <b style="font-size:18px;">{int(max_site_pwr)} kW</b>
+                                    <span style="background-color: #f0f0f0; border: 1px solid #ccc; padding: 2px 8px; border-radius: 12px; font-size: 13px; font-weight: bold; margin-left: 5px; vertical-align: middle;">
+                                        {total_chargers} 🔌
+                                    </span>
+                                </div>
+                                <div style="font-size:12px; color: #666; margin-bottom: 12px;">{op_name}</div>
+                                
+                                <a href="{g_maps}" target="_blank" style="background:#4285F4;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;margin-bottom:8px;font-weight:bold;font-size:13px;">Google Maps</a>
+                                <a href="{a_maps}" target="_blank" style="background:black;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;font-weight:bold;font-size:13px;">Apple Maps</a>
                                </div>'''
                 
                 folium.Marker([lat, lon], icon=get_lightning_html(max_site_pwr, s_color), popup=folium.Popup(pop_html, max_width=250)).add_to(m)
@@ -197,4 +203,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_all_features", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_ladestationen_final", use_container_width=True)
