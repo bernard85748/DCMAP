@@ -6,7 +6,7 @@ from streamlit_js_eval import get_geolocation
 from folium.features import DivIcon
 
 # --- SETUP ---
-st.set_page_config(page_title="EV DC-Master Pro", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="DC Ladestationen", layout="wide", page_icon="⚡")
 API_KEY = st.secrets.get("OCM_API_KEY", None)
 
 def get_lightning_html(power_kw, status_color):
@@ -29,25 +29,23 @@ def get_lightning_html(power_kw, status_color):
     )
 
 # --- SIDEBAR ---
-st.sidebar.title("🚀 DC-Spezialsuche")
+st.sidebar.title("🚀 Filter")
 search_city = st.sidebar.text_input("Zielstadt suchen", key="city_input")
+# Radius jetzt direkt unter der Zielstadt
+search_radius = st.sidebar.slider("Radius (km)", 10, 500, 150)
 
 st.sidebar.divider()
-st.sidebar.title("🔋 Reichweite")
-
-# NEU: Batterie und Verbrauch als Schieberegler
+st.sidebar.title("🔋 BEV-Reichweite")
 battery = st.sidebar.slider("Batterie Kapazität (kWh)", min_value=10, max_value=150, value=75, step=1)
 soc = st.sidebar.slider("Aktueller Akku (%)", 0, 100, 40)
 cons = st.sidebar.slider("Verbrauch (kWh/100km)", min_value=10.0, max_value=40.0, value=20.0, step=0.5)
 
-# Berechnung
+# Reichweite intern berechnen
 range_km = int((battery * (soc / 100)) / cons * 100)
-st.sidebar.metric("Berechnete Reichweite", f"{range_km} km")
 
 st.sidebar.divider()
-st.sidebar.title("⚙️ Filter")
+st.sidebar.title("⚙️ DC-Stationen")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
-search_radius = st.sidebar.slider("Radius (km)", 10, 500, 150)
 only_tesla = st.sidebar.checkbox("Nur Tesla Supercharger")
 
 # --- STANDORT ---
@@ -56,7 +54,7 @@ target_lat, target_lon = None, None
 
 if search_city:
     try:
-        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V8'}).json()
+        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V12'}).json()
         if geo: target_lat, target_lon = float(geo[0]['lat']), float(geo[0]['lon'])
     except: pass
 
@@ -68,7 +66,7 @@ final_lat = target_lat if target_lat else default_lat
 final_lon = target_lon if target_lon else default_lon
 
 # --- KARTE ---
-st.title("⚡ EV DC-Master Pro")
+st.title("⚡ DC Ladestationen")
 
 m = folium.Map(location=[final_lat, final_lon], zoom_start=8, tiles="cartodbpositron")
 folium.Circle([final_lat, final_lon], radius=range_km*1000, color="green", fill=True, fill_opacity=0.1).add_to(m)
@@ -99,37 +97,4 @@ if API_KEY:
                 if c_pwr > pwr: pwr = c_pwr
                 total_chargers += int(c.get('Quantity', 1) or 1)
 
-            if pwr < min_power: continue
-            
-            op_info = poi.get('OperatorInfo')
-            op_name = op_info.get('Title') if op_info else "Unbekannter Betreiber"
-            if only_tesla and "tesla" not in op_name.lower(): continue
-
-            s_id = int(poi.get('StatusTypeID', 0) or 0)
-            s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
-            
-            lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
-            nav_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
-            
-            pop_html = f"""
-            <div style="font-family: 'Segoe UI', Arial; width: 200px; line-height: 1.4;">
-                <b style="font-size: 14px; color: #333;">{op_name}</b><br>
-                <hr style="margin: 5px 0; border: 0; border-top: 1px solid #eee;">
-                Leistung: <span style="color: #d32f2f; font-weight: bold;">{int(pwr)} kW</span><br>
-                Ladepunkte: <b>{total_chargers} Stecker</b><br><br>
-                <a href="{nav_url}" target="_blank" style="background-color: #1a73e8; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; display: block; text-align: center; font-weight: bold;">📍 Navigation</a>
-            </div>
-            """
-            
-            folium.Marker(
-                [lat, lon],
-                icon=get_lightning_html(pwr, s_color),
-                popup=folium.Popup(pop_html, max_width=250)
-            ).add_to(m)
-            found_count += 1
-        
-        st.sidebar.success(f"Gefunden: {found_count} DC-Parks")
-    except Exception as e:
-        st.sidebar.error(f"Datenfehler: {e}")
-
-st_folium(m, height=600, width=None, key="dc_final_v4")
+            if pwr
