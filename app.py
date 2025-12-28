@@ -22,7 +22,6 @@ st.markdown("""
     .block-container { padding: 0rem; }
     header { visibility: visible !important; }
     
-    /* Treffer-Badge oben rechts */
     .found-badge {
         position: fixed;
         top: 60px;
@@ -36,7 +35,6 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
     
-    /* Styling für die Legende in der Sidebar */
     .sidebar-legend {
         background-color: rgba(255, 255, 255, 0.05);
         padding: 12px;
@@ -46,7 +44,6 @@ st.markdown("""
         border: 1px solid #444;
     }
     
-    /* Sidebar-Pfeil besser sichtbar machen */
     button[kind="header"] {
         background-color: rgba(255, 255, 255, 0.9) !important;
         border-radius: 50% !important;
@@ -64,10 +61,10 @@ def get_lightning_html(power_kw, status_color):
         color, count = "#000000", 3 
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
-    # Schwarze Blitze bekommen einen weißen Rand für Sichtbarkeit auf der Karte
     text_style = "text-shadow: 0 0 3px white;" if color == "#000000" else ""
     
-    icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 1px; {text_style}"></i>' for _ in range(count)])
+    # &#FE0E; erzwingt die Textdarstellung (verhindert Gold-Emoji)
+    icons = "".join([f'<span style="color:{color}; margin: 1px; {text_style}">⚡&#FE0E;</span>' for _ in range(count)])
     
     return DivIcon(
         html=f"""<div style="display: flex; flex-direction: column; align-items: center; width: 60px;">
@@ -86,20 +83,20 @@ st.sidebar.title("⚙️ DC-Leistung")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# Legende mit farblich identischen Blitzen zur Karte
+# Legende mit erzwungenen Farben (Variation Selector-15 Fix)
 st.sidebar.markdown("""
 <div class="sidebar-legend">
     <strong>Blitze (Leistung):</strong><br>
     <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-        <span style="color:#3b82f6; font-size: 20px;">⚡</span> 
+        <span style="color:#3b82f6; font-size: 20px;">⚡&#FE0E;</span> 
         <span>50 - 200 kW</span>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="color:#ef4444; font-size: 20px;">⚡⚡</span> 
+        <span style="color:#ef4444; font-size: 20px;">⚡⚡&#FE0E;</span> 
         <span>201 - 349 kW</span>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="color:#000000; font-size: 20px; text-shadow: 0 0 2px white, 0 0 5px white;">⚡⚡⚡</span> 
+        <span style="color:#000000; font-size: 20px; text-shadow: 0 0 2px white, 0 0 5px white;">⚡⚡⚡&#FE0E;</span> 
         <span style="font-weight: bold;">≥ 350 kW</span>
     </div>
     <hr style="margin: 12px 0; border-color: #444;">
@@ -201,4 +198,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_colored_legend", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_emoji_fix", use_container_width=True)
