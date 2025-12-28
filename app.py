@@ -13,11 +13,20 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# CSS für Mobile-Optimierung
+# CSS für echten Fullscreen & keine Abstände
 st.markdown("""
     <style>
-    .main > div { padding-top: 2rem; }
-    iframe { width: 100% !important; border-radius: 10px; }
+    /* Entfernt den Abstand oben */
+    .block-container {
+        padding-top: 0rem;
+        padding-bottom: 0rem;
+        padding-left: 0rem;
+        padding-right: 0rem;
+    }
+    /* Versteckt den Streamlit Header (Drei Punkte/Menü) */
+    header {visibility: hidden;}
+    /* Die Karte soll so viel Platz wie möglich einnehmen */
+    iframe { height: 95vh !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -80,7 +89,6 @@ final_lat = target_lat if target_lat else default_lat
 final_lon = target_lon if target_lon else default_lon
 
 # --- KARTE ---
-st.title("⚡ DC Ladestationen")
 
 m = folium.Map(location=[final_lat, final_lon], zoom_start=9, tiles="cartodbpositron")
 folium.Circle([final_lat, final_lon], radius=range_km*1000, color="green", fill=True, fill_opacity=0.1).add_to(m)
@@ -143,3 +151,4 @@ else:
         st.sidebar.error(f"Fehler: {e}")
 
 st_folium(m, height=700, width=None, key="dc_final_v15", use_container_width=True)
+
