@@ -30,19 +30,15 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
-    # DEFINITIVE LOGIK FÜR DIE BLITZ-ANZAHL
-    # Kategorie 1: Alles ab 350 kW (3 schwarze Blitze)
-    if power_kw >= 350:
-        color, count = "#000000", 3
-    # Kategorie 2: Alles über 200 kW bis 349 kW (2 rote Blitze)
+    # NEUE CLUSTER-LOGIK
+    if power_kw > 300:
+        color, count = "#000000", 3  # Schwarz: > 300 kW
     elif power_kw > 200:
-        color, count = "#ef4444", 2
-    # Kategorie 3: Alles andere (bis 200 kW) (1 blauer Blitz)
+        color, count = "#ef4444", 2  # Rot: 201 - 300 kW
     else:
-        color, count = "#3b82f6", 1
+        color, count = "#3b82f6", 1  # Blau: bis 200 kW
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
-    # Erzeugt die entsprechende Anzahl an Blitzen
     icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 0 1px;"></i>' for _ in range(count)])
     
     return DivIcon(
@@ -55,10 +51,7 @@ def get_lightning_html(power_kw, status_color):
 
 # --- STANDORT ---
 loc = get_geolocation()
-current_lat, current_lon = None, None
-if loc and loc.get('coords'):
-    current_lat = loc['coords']['latitude']
-    current_lon = loc['coords']['longitude']
+current_lat, current_lon = (loc['coords']['latitude'], loc['coords']['longitude']) if loc and loc.get('coords') else (None, None)
 
 # --- SIDEBAR ---
 st.sidebar.title("🚀 Zielsuche")
@@ -69,13 +62,13 @@ st.sidebar.title("🔌 DC Ladesäule")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# --- LEGENDE ---
+# --- LEGENDE (Aktualisiert auf neue Cluster) ---
 legende_html = f'''
 <div style="background-color: #f0f0f0; padding: 15px; border-radius: 10px; border: 1px solid #ccc; color: #000; font-family: sans-serif;">
     <strong style="font-size: 14px;">Blitze (Leistung):</strong><br>
     <div style="margin-top:10px;"><i class="fa fa-bolt" style="color:#3b82f6;"></i> 50-200 kW</div>
-    <div style="margin-top:5px;"><i class="fa fa-bolt" style="color:#ef4444;"></i><i class="fa fa-bolt" style="color:#ef4444;"></i> 201-349 kW</div>
-    <div style="margin-top:5px;"><i class="fa fa-bolt" style="color:#000;"></i><i class="fa fa-bolt" style="color:#000;"></i><i class="fa fa-bolt" style="color:#000;"></i> ≥350 kW</div>
+    <div style="margin-top:5px;"><i class="fa fa-bolt" style="color:#ef4444;"></i><i class="fa fa-bolt" style="color:#ef4444;"></i> 201-300 kW</div>
+    <div style="margin-top:5px;"><i class="fa fa-bolt" style="color:#000;"></i><i class="fa fa-bolt" style="color:#000;"></i><i class="fa fa-bolt" style="color:#000;"></i> > 300 kW</div>
 </div>
 '''
 st.sidebar.markdown(legende_html, unsafe_allow_html=True)
@@ -144,4 +137,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, use_container_width=True, key="final_fix_v2")
+st_folium(m, height=800, width=None, use_container_width=True, key="new_cluster_v1")
