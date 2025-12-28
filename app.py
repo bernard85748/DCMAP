@@ -16,16 +16,24 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# CSS für radikalen Fullscreen & schwebende Badge
+# CSS für Fullscreen + sichtbaren Sidebar-Button
 st.markdown("""
     <style>
-    .block-container { padding: 0rem; }
-    header { visibility: hidden; }
-    footer { visibility: hidden; }
-    #MainMenu { visibility: hidden; }
-    .stApp { bottom: 0; }
+    /* Den Abstand oben lassen wir minimal, damit der Button sichtbar bleibt */
+    .block-container { 
+        padding-top: 1rem; 
+        padding-bottom: 0rem;
+    }
     
-    /* Schwebende Badge oben rechts */
+    header { visibility: visible !important; opacity: 0.5; } /* Macht den Header leicht sichtbar */
+    
+    /* Falls der Standard-Button nicht reicht, hier ein Hinweis-Pfeil */
+    [data-testid="stSidebarNav"] {
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 0 10px 10px 0;
+    }
+
+    /* Schwebende Badge oben rechts (wie gehabt) */
     .found-badge {
         position: absolute;
         top: 10px;
@@ -120,3 +128,4 @@ if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
 st_folium(m, height=800, width=None, key="dc_final_full", use_container_width=True)
+
