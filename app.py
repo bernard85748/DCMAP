@@ -9,7 +9,6 @@ from folium.features import DivIcon
 st.set_page_config(page_title="EV Ultra Finder Pro", layout="wide", page_icon="⚡")
 
 def get_lightning_html(power_kw, status_color):
-    # Logik für Blitze: Blau (50-199kW), Rot (200-300kW), Schwarz (>300kW)
     if 50 <= power_kw < 200:
         color, count = "blue", 1
     elif 200 <= power_kw <= 300:
@@ -17,7 +16,6 @@ def get_lightning_html(power_kw, status_color):
     else:
         color, count = "black", 3
 
-    # Glow-Effekt nur bei echtem Status (Grün/Rot)
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color in ["#00FF00", "#FF0000"] else ""
     
     icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 1px;"></i>' for _ in range(count)])
@@ -44,12 +42,12 @@ loc = get_geolocation()
 if loc is not None:
     lat, lon = loc['coords']['latitude'], loc['coords']['longitude']
     
-    # Karte erstellen
-    m = folium.Map(location=[lat, lon], zoom_start=8, tiles="cartodbpositron")
+    # Karte erstellen - Zoom passt sich bei 1000km automatisch etwas an
+    zoom = 10 if search_radius < 100 else 6
+    m = folium.Map(location=[lat, lon], zoom_start=zoom, tiles="cartodbpositron")
     folium.Marker([lat, lon], popup="Dein Standort", icon=folium.Icon(color='blue', icon='user', prefix='fa')).add_to(m)
 
     if API_KEY:
-        # URL mit dynamischem Radius und erhöhtem maxresults für große Flächen
         url = f"https://api.openchargemap.io/v3/poi/?key={API_KEY}&latitude={lat}&longitude={lon}&distance={search_radius}&countrycode=DE&maxresults=250"
         
         try:
@@ -66,7 +64,6 @@ if loc is not None:
                         power = max([c.get('PowerKW', 0) for c in poi['Connections'] if c.get('PowerKW') is not None], default=0)
                     
                     if power >= min_power:
-                        # Name bestimmen
                         if poi.get('OperatorInfo') and poi['OperatorInfo'].get('Title'):
                             betreiber = poi['OperatorInfo']['Title']
                         elif poi.get('AddressInfo') and poi['AddressInfo'].get('Title'):
@@ -76,9 +73,7 @@ if loc is not None:
                         
                         betreiber = betreiber.split('(')[0].strip()
 
-                        # Status-Logik (Optimistisch)
                         status_id = int(poi.get('StatusTypeID', 0))
-                        
                         if status_id in [10, 15, 50]:
                             s_color, s_text = "#00FF00", "VERFÜGBAR"
                         elif status_id in [20, 30, 75]:
@@ -91,14 +86,39 @@ if loc is not None:
                         if show_only_live and s_color not in ["#00FF00", "#FF0000"]:
                             continue
 
+                        # NEU: Google Maps Navigations-Link erstellen
+                        # 'origin' wird weggelassen, Google nutzt dann automatisch den aktuellen Standort
+                        nav_url = f"https://www.google.com/maps/dir/?api=1&destination={p_lat},{p_lon}&travelmode=driving"
+
+                        html_popup = f"""
+                        <div style="font-family: sans-serif; min-width: 150px;">
+                            <b style="font-size: 14px;">{betreiber}</b><br>
+                            <span style="color: gray;">Leistung:</span> <b>{power} kW</b><br>
+                            <span style="color: {s_color}; font-weight: bold;">● {s_text}</span><br>
+                            <hr style="margin: 8px 0;">
+                            <a href="{nav_url}" target="_blank" style="
+                                display: block; 
+                                text-align: center; 
+                                background-color: #4285F4; 
+                                color: white; 
+                                padding: 8px; 
+                                border-radius: 4px; 
+                                text-decoration: none; 
+                                font-weight: bold;
+                                font-size: 12px;">
+                                📍 In Google Maps öffnen
+                            </a>
+                        </div>
+                        """
+
                         folium.Marker(
                             location=[p_lat, p_lon],
-                            popup=f"<b>{betreiber}</b><br>Leistung: {power} kW<br>Status: {s_text}",
+                            popup=folium.Popup(html_popup, max_width=200),
                             icon=get_lightning_html(power, s_color)
                         ).add_to(m)
                 except: continue
         except: st.error("Fehler beim Abrufen der Daten.")
     
-    st_folium(m, width="100%", height=650)
+    st_folium(m, width="100%", height=700)
 else:
     st.info("🌐 Suche Standort... Bitte Freigabe im Browser bestätigen.")
