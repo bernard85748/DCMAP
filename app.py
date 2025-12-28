@@ -16,8 +16,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- CSS (Design & Mobile Optimierung) ---
+# --- CSS (Design & Icons) ---
 st.markdown("""
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
     .block-container { padding: 0rem; }
     header { visibility: visible !important; }
@@ -52,7 +53,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
-    # Logik: 1 Blau (bis 200), 2 Rot (bis 349), 3 Schwarz (ab 350)
     if power_kw <= 200: 
         color, count = "#3b82f6", 1 
     elif 200 < power_kw < 350: 
@@ -61,10 +61,11 @@ def get_lightning_html(power_kw, status_color):
         color, count = "#000000", 3 
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
-    text_style = "text-shadow: 0 0 3px white;" if color == "#000000" else ""
+    # Weißer Rand nur für schwarze Blitze auf der Karte
+    text_shadow = "filter: drop-shadow(0 0 2px white);" if color == "#000000" else ""
     
-    # &#FE0E; erzwingt die Textdarstellung (verhindert Gold-Emoji)
-    icons = "".join([f'<span style="color:{color}; margin: 1px; {text_style}">⚡&#FE0E;</span>' for _ in range(count)])
+    # Nutzung von Font-Awesome Blitzen statt Emojis
+    icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 0 1px; {text_shadow}"></i>' for _ in range(count)])
     
     return DivIcon(
         html=f"""<div style="display: flex; flex-direction: column; align-items: center; width: 60px;">
@@ -83,20 +84,27 @@ st.sidebar.title("⚙️ DC-Leistung")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# Legende mit erzwungenen Farben (Variation Selector-15 Fix)
-st.sidebar.markdown("""
+# Legende mit Font-Awesome Icons (keine Emojis mehr!)
+st.sidebar.markdown(f"""
 <div class="sidebar-legend">
     <strong>Blitze (Leistung):</strong><br>
     <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-        <span style="color:#3b82f6; font-size: 20px;">⚡&#FE0E;</span> 
+        <i class="fa fa-bolt" style="color:#3b82f6; font-size: 20px;"></i>
         <span>50 - 200 kW</span>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="color:#ef4444; font-size: 20px;">⚡⚡&#FE0E;</span> 
+        <span style="display: flex; gap: 2px;">
+            <i class="fa fa-bolt" style="color:#ef4444; font-size: 20px;"></i>
+            <i class="fa fa-bolt" style="color:#ef4444; font-size: 20px;"></i>
+        </span>
         <span>201 - 349 kW</span>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="color:#000000; font-size: 20px; text-shadow: 0 0 2px white, 0 0 5px white;">⚡⚡⚡&#FE0E;</span> 
+        <span style="display: flex; gap: 2px;">
+            <i class="fa fa-bolt" style="color:#000000; font-size: 20px; filter: drop-shadow(0 0 1px white);"></i>
+            <i class="fa fa-bolt" style="color:#000000; font-size: 20px; filter: drop-shadow(0 0 1px white);"></i>
+            <i class="fa fa-bolt" style="color:#000000; font-size: 20px; filter: drop-shadow(0 0 1px white);"></i>
+        </span>
         <span style="font-weight: bold;">≥ 350 kW</span>
     </div>
     <hr style="margin: 12px 0; border-color: #444;">
@@ -108,10 +116,6 @@ st.sidebar.markdown("""
     <div style="display: flex; align-items: center; gap: 10px;">
         <span style="color:#FF0000; filter: drop-shadow(0 0 2px #FF0000);">●</span> 
         <span>Belegt / Defekt</span>
-    </div>
-    <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="color:#A9A9A9;">●</span> 
-        <span>Unbekannt</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -198,4 +202,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_emoji_fix", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_fa_icons", use_container_width=True)
