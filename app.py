@@ -9,6 +9,7 @@ from folium.features import DivIcon
 st.set_page_config(page_title="EV Ultra Finder Pro", layout="wide", page_icon="⚡")
 
 def get_lightning_html(power_kw, status_color):
+    """Erzeugt das Blitz-Icon basierend auf der Ladeleistung."""
     if 50 <= power_kw < 200:
         color, count = "blue", 1
     elif 200 <= power_kw <= 300:
@@ -29,23 +30,16 @@ def get_lightning_html(power_kw, status_color):
 
 # --- SIDEBAR: NAVIGATION & FILTER ---
 st.sidebar.title("🌍 Reiseplanung")
-search_city = st.sidebar.text_input("Stadt suchen (z.B. Paris)", "")
+search_city = st.sidebar.text_input("Stadt suchen (z.B. Paris, Wien, Berlin)", "")
 
 st.sidebar.title("⚙️ Filter")
 
-# NEU: Länder Auswahl (ISO-Codes für die API)
+# Länder Auswahl (Europa)
 country_options = {
-    "Deutschland": "DE",
-    "Österreich": "AT",
-    "Schweiz": "CH",
-    "Frankreich": "FR",
-    "Italien": "IT",
-    "Spanien": "ES",
-    "Niederlande": "NL",
-    "Dänemark": "DK",
-    "Norwegen": "NO",
-    "Schweden": "SE",
-    "Belgien": "BE"
+    "Deutschland": "DE", "Österreich": "AT", "Schweiz": "CH", 
+    "Frankreich": "FR", "Italien": "IT", "Spanien": "ES", 
+    "Niederlande": "NL", "Dänemark": "DK", "Norwegen": "NO", 
+    "Schweden": "SE", "Belgien": "BE", "UK": "GB"
 }
 selected_countries = st.sidebar.multiselect(
     "Länder auswählen",
@@ -78,6 +72,7 @@ search_radius = st.sidebar.slider("Suchradius (km)", 10, 1000, 100)
 
 st.title("⚡ EV Pro Finder")
 
+# API Key aus den Streamlit Secrets laden
 API_KEY = st.secrets.get("OCM_API_KEY", None)
 
 # --- STANDORT-LOGIK ---
@@ -99,32 +94,20 @@ else:
 
 # --- KARTE UND DATEN ---
 if target_lat and target_lon:
+    # Dynamische Zoom-Stufe
     zoom = 11 if search_radius < 50 else (8 if search_radius < 150 else 6)
     m = folium.Map(location=[target_lat, target_lon], zoom_start=zoom, tiles="cartodbpositron")
     folium.Marker([target_lat, target_lon], popup="Zentrum", icon=folium.Icon(color='blue', icon='star')).add_to(m)
 
     if API_KEY:
-        # Länder-Codes für die API aufbereiten
+        # Parameter vorbereiten
         c_codes = [country_options[name] for name in selected_countries]
         country_param = ",".join(c_codes) if c_codes else ""
         
-        # Steckertypen aufbereiten
         connector_ids = [connector_options[name] for name in selected_connectors]
         conn_param = ",".join(map(str, connector_ids)) if connector_ids else ""
         
-        # API URL zusammenbauen (countrycode Parameter nutzt die Auswahl)
+        # API URL (maxresults auf 1000 für Europa-Suche)
         url = f"https://api.openchargemap.io/v3/poi/?key={API_KEY}&latitude={target_lat}&longitude={target_lon}&distance={search_radius}&maxresults=1000&compact=true"
         
-        if country_param:
-            url += f"&countrycode={country_param}"
-        if conn_param:
-            url += f"&connectiontypeid={conn_param}"
-        
-        try:
-            data = requests.get(url).json()
-            for poi in data:
-                try:
-                    p_lat, p_lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
-                    power = max([c.get('PowerKW', 0) for c in poi.get('Connections', []) if c.get('PowerKW')], default=0)
-
-                    if power < min_power: continue
+        if country_param: url += f"&countrycode
