@@ -71,21 +71,25 @@ if loc is not None:
                         
                         betreiber = betreiber.split('(')[0].strip() # Entfernt (Operator) etc.
 
-                        # --- 2. STATUS-GARANTIE LOGIK ---
-                        status_id = poi.get('StatusTypeID', 0)
+                      # --- 2. KORRIGIERTE STATUS-LOGIK ---
+                        status_id = int(poi.get('StatusTypeID', 0))
                         
-                        # Mapping der OCM-IDs auf verständliche Farben
-                        if status_id == 10: # Verfügbar
-                            s_color = "#00FF00" 
+                        # Offizielle OCM Status IDs:
+                        # 10, 15: Verfügbar (Green)
+                        # 20, 30, 75: Belegt (Red)
+                        # 50, 100, 150, 200, 210: Defekt/Wartung (Orange)
+                        
+                        if status_id in [10, 15]: 
+                            s_color = "#00FF00" # GRÜN
                             status_text = "FREI"
-                        elif status_id in [20, 30, 75]: # Belegt
-                            s_color = "#FF0000"
+                        elif status_id in [20, 30, 75]: 
+                            s_color = "#FF0000" # ROT
                             status_text = "BELEGT"
-                        elif status_id in [50, 100, 150]: # Defekt
-                            s_color = "#FFA500"
-                            status_text = "DEFEKT"
-                        else: # Unbekannt
-                            s_color = "#A9A9A9"
+                        elif status_id in [50, 100, 150, 200, 210]: 
+                            s_color = "#FFA500" # ORANGE
+                            status_text = "DEFEKT / WARTUNG"
+                        else: 
+                            s_color = "#A9A9A9" # GRAU
                             status_text = "STATUS UNBEKANNT"
                         
                         # Marker setzen
@@ -102,3 +106,4 @@ if loc is not None:
     st_folium(m, width="100%", height=650)
 else:
     st.info("🌐 Bitte Standortzugriff im Browser erlauben...")
+
