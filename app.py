@@ -16,35 +16,54 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# CSS für maximalen Kontrast und Lesbarkeit auf dem Smartphone
+# CSS für maximalen Kontrast und Lesbarkeit
 st.markdown("""
     <style>
-    .block-container { padding-top: 0rem; padding-bottom: 0rem; }
+    .block-container { padding-top: 0rem; padding-bottom: 0rem; padding-left: 0rem; padding-right: 0rem; }
     header { visibility: visible !important; }
     
-    /* Kontraststarke Badge oben rechts */
     .found-badge {
         position: absolute;
         top: 15px;
         right: 15px;
-        background-color: #222222; /* Dunkler Hintergrund */
-        color: #ffffff !important;  /* Reinweiße Schrift */
+        background-color: #222222;
+        color: #ffffff !important;
         padding: 8px 15px;
         border-radius: 10px;
         border: 2px solid #444;
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        font-size: 16px;            /* Etwas größer für Mobile */
-        font-weight: 800;           /* Extra fett */
+        font-family: sans-serif;
+        font-size: 16px;
+        font-weight: 800;
         z-index: 1001;
         box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-        pointer-events: none;       /* Klicks gehen durch auf die Karte */
+        pointer-events: none;
     }
 
-    /* Sidebar-Button (Pfeil) besser sichtbar machen */
+/* Legende unten rechts */
+    .legend-badge {
+        position: absolute;
+        bottom: 30px;
+        right: 15px;
+        background-color: rgba(34, 34, 34, 0.85);
+        color: #ffffff;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #444;
+        font-family: sans-serif;
+        font-size: 12px;
+        z-index: 1001;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        pointer-events: none;
+        line-height: 1.5;
+    }
+    
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .bolt-blue { color: blue; }
+    .bolt-red { color: red; }
+    .bolt-black { color: #000; text-shadow: 0 0 2px white; }
     button[kind="header"] {
         background-color: rgba(255, 255, 255, 0.8) !important;
         border-radius: 50% !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -66,16 +85,20 @@ def get_lightning_html(power_kw, status_color):
 # --- SIDEBAR ---
 st.sidebar.title("🚀 Filter")
 search_city = st.sidebar.text_input("Zielstadt", placeholder="Suchen...", key="city_input")
-search_radius = st.sidebar.slider("Radius (km)", 10, 500, 150)
+# Radius Slider wurde hier entfernt
+
 st.sidebar.divider()
 st.sidebar.title("⚙️ DC-Ladeleistung") 
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 only_tesla = st.sidebar.checkbox("Nur Tesla Supercharger")
+
 st.sidebar.divider()
 st.sidebar.title("🔋 BEV-Reichweitenradius")
 battery = st.sidebar.slider("Batterie (kWh)", 10, 150, 75)
 soc = st.sidebar.slider("Akku (%)", 0, 100, 40)
 cons = st.sidebar.slider("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, 0.5)
+
+# Reichweite berechnen - Dies ist nun auch unser Suchradius!
 range_km = int((battery * (soc / 100)) / cons * 100)
 
 # --- STANDORT ---
@@ -100,7 +123,18 @@ folium.Circle([final_lat, final_lon], radius=range_km*1000, color="green", fill=
 found_count = 0
 if API_KEY:
     try:
-        params = {"key": API_KEY, "latitude": final_lat, "longitude": final_lon, "distance": search_radius, "distanceunit": "KM", "maxresults": 500, "compact": "false", "minpowerkw": min_power, "connectiontypeid": "33,30"}
+        # Wir nutzen range_km als dynamischen Suchradius für die API
+        params = {
+            "key": API_KEY, 
+            "latitude": final_lat, 
+            "longitude": final_lon, 
+            "distance": range_km, 
+            "distanceunit": "KM", 
+            "maxresults": 250, 
+            "compact": "false", 
+            "minpowerkw": min_power, 
+            "connectiontypeid": "33,30"
+        }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
         for poi in res:
             conns = poi.get('Connections', [])
@@ -121,10 +155,7 @@ if API_KEY:
             found_count += 1
     except: pass
 
-# Badge anzeigen
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_full", use_container_width=True)
-
-
+st_folium(m, height=800, width=None, key="dc_final_auto_radius", use_container_width=True)
