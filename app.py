@@ -30,10 +30,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
-    # ZURÜCK ZUR ALTEN LOGIK (Punkt 2)
+    # BLITZ-LOGIK (Rollback)
     if power_kw <= 200:
         color, count = "#3b82f6", 1
-    elif 200 < power_kw < 350:
+    elif power_kw < 350:
         color, count = "#ef4444", 2
     else:
         color, count = "#000000", 3
@@ -59,7 +59,8 @@ search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München
 
 st.sidebar.divider()
 st.sidebar.title("🔌 DC-Leistung")
-min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
+# WICHTIG: min_power wird jetzt lokal im Code gefiltert, nicht in der API-Anfrage
+min_power = st.sidebar.slider("Mindestleistung (kW)", 20, 400, 50) 
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
 # --- LEGENDE ---
@@ -94,7 +95,7 @@ if current_lat:
     folium.Marker([current_lat, current_lon], icon=folium.Icon(color='blue', icon='user', prefix='fa')).add_to(m)
     folium.Circle([current_lat, current_lon], radius=range_km*1000, color="blue", fill=True, fill_opacity=0.05).add_to(m)
 
-# --- DATEN (Punkt 3: Direkte API-Suche ohne Puffer) ---
+# --- DATEN (Punkt 3: API liefert alles ab 20kW, App filtert den Rest) ---
 found_count = 0
 if API_KEY:
     try:
@@ -102,11 +103,12 @@ if API_KEY:
             "key": API_KEY, 
             "latitude": final_lat, 
             "longitude": final_lon, 
-            "distance": range_km, 
+            "distance": range_km if range_km > 0 else 50, 
             "distanceunit": "KM", 
-            "maxresults": 200, 
+            "maxresults": 250, 
             "compact": "false", 
-            "connectiontypeid": "33,30"
+            "connectiontypeid": "33,30",
+            "minpowerkw": 20 # API liefert alles ab 20kW, damit wir blaue Säulen sehen
         }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
         
@@ -118,7 +120,9 @@ if API_KEY:
                 if p > max_pwr: max_pwr = p
                 qty += int(c.get('Quantity', 1) or 1)
             
+            # HIER passiert die Filterung basierend auf deinem Slider:
             if max_pwr < min_power: continue
+            
             op_name = poi.get('OperatorInfo', {}).get('Title', "Unbekannt")
             if hide_tesla and "tesla" in op_name.lower(): continue
             
@@ -140,4 +144,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, use_container_width=True, key="dc_final_rollbacked")
+st_folium(m, height=800, width=None, use_container_width=True, key="dc_final_blue_fix")
