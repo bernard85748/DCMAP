@@ -33,18 +33,20 @@ st.sidebar.title("🚀 Filter")
 search_city = st.sidebar.text_input("Zielstadt suchen", key="city_input")
 search_radius = st.sidebar.slider("Radius (km)", 10, 500, 150)
 
+# NEU: DC-Ladeleistung nach oben verschoben
 st.sidebar.divider()
-st.sidebar.title("🔋 BEV-Reichweite")
+st.sidebar.title("⚙️ DC-Ladeleistung") 
+min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
+only_tesla = st.sidebar.checkbox("Nur Tesla Supercharger")
+
+# NEU: BEV-Reichweitenradius nach unten verschoben
+st.sidebar.divider()
+st.sidebar.title("🔋 BEV-Reichweitenradius")
 battery = st.sidebar.slider("Batterie Kapazität (kWh)", min_value=10, max_value=150, value=75, step=1)
 soc = st.sidebar.slider("Aktueller Akku (%)", 0, 100, 40)
 cons = st.sidebar.slider("Verbrauch (kWh/100km)", min_value=10.0, max_value=40.0, value=20.0, step=0.5)
 
 range_km = int((battery * (soc / 100)) / cons * 100)
-
-st.sidebar.divider()
-st.sidebar.title("⚙️ DC-Stationen")
-min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
-only_tesla = st.sidebar.checkbox("Nur Tesla Supercharger")
 
 # --- STANDORT ---
 default_lat, default_lon = 50.1109, 8.6821 
@@ -52,7 +54,7 @@ target_lat, target_lon = None, None
 
 if search_city:
     try:
-        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V15'}).json()
+        geo = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}", headers={'User-Agent': 'EV-Finder-V17'}).json()
         if geo: target_lat, target_lon = float(geo[0]['lat']), float(geo[0]['lon'])
     except: pass
 
@@ -103,14 +105,13 @@ if API_KEY:
             if only_tesla and "tesla" not in op_name.lower():
                 continue
 
-            # Status Bestimmung (sauber strukturiert)
             s_id = int(poi.get('StatusTypeID', 0) or 0)
             if s_id in [10, 15, 50]:
-                s_color = "#00FF00" # Grün (Verfügbar)
+                s_color = "#00FF00" 
             elif s_id in [20, 30, 75]:
-                s_color = "#FF0000" # Rot (Belegt/Defekt)
+                s_color = "#FF0000" 
             else:
-                s_color = "#A9A9A9" # Grau (Unbekannt)
+                s_color = "#A9A9A9" 
             
             lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
             nav_url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
@@ -136,4 +137,4 @@ if API_KEY:
     except Exception as e:
         st.sidebar.error(f"Datenfehler: {e}")
 
-st_folium(m, height=600, width=None, key="dc_final_v12")
+st_folium(m, height=600, width=None, key="dc_final_v14")
