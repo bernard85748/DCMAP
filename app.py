@@ -34,7 +34,6 @@ st.markdown("""
             font-weight: bold;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
-        .stSpinner > div { border-top-color: #3b82f6 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -74,7 +73,7 @@ st.sidebar.title("🔌 DC Ladesäule")
 min_power = st.sidebar.slider("Mindestleistung (kW)", 50, 400, 150)
 hide_tesla = st.sidebar.checkbox("Tesla Supercharger ausblenden")
 
-# --- LEGENDE ALS VARIABLE (VERHINDERT CODE-AUSGABE) ---
+# --- LEGENDE ALS VARIABLE (Stabilisiert) ---
 legende_html = f'''
 <div style="background-color: #f0f0f0; padding: 15px; border-radius: 10px; border: 1px solid #ccc; color: #000000; font-family: sans-serif;">
     <strong style="font-size: 14px;">Blitze (Leistung):</strong><br>
@@ -118,7 +117,7 @@ soc = st.sidebar.slider("Aktueller SOC (%)", 0, 100, 20)
 cons = st.sidebar.slider("Verbrauch (kWh/100km)", 10.0, 40.0, 20.0, 0.5)
 range_km = int((battery * (soc / 100)) / cons * 100)
 
-# --- ZENTRUM BESTIMMEN ---
+# --- ZENTRUM ---
 default_lat, default_lon = 50.1109, 8.6821 
 target_lat, target_lon = None, None
 
@@ -141,46 +140,45 @@ if current_lat and current_lon:
     folium.Marker([current_lat, current_lon], popup="Mein Standort", icon=folium.Icon(color='blue', icon='user', prefix='fa')).add_to(m)
     folium.Circle([current_lat, current_lon], radius=range_km*1000, color="blue", fill=True, fill_opacity=0.05).add_to(m)
 
-# --- DATEN LADEN MIT SPINNER ---
+# --- DATEN LADEN (Spinner entfernt) ---
 found_count = 0
 if API_KEY:
-    with st.spinner('Lade Ladesäulen...'):
-        try:
-            params = {"key": API_KEY, "latitude": final_lat, "longitude": final_lon, "distance": range_km, "distanceunit": "KM", "maxresults": 150, "compact": "false", "minpowerkw": min_power, "connectiontypeid": "33,30"}
-            res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
+    try:
+        params = {"key": API_KEY, "latitude": final_lat, "longitude": final_lon, "distance": range_km, "distanceunit": "KM", "maxresults": 150, "compact": "false", "minpowerkw": min_power, "connectiontypeid": "33,30"}
+        res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
+        
+        for poi in res:
+            conns = poi.get('Connections', [])
+            max_pwr, qty = 0, 0
+            for c in conns:
+                p = float(c.get('PowerKW', 0) or 0)
+                if p > max_pwr: max_pwr = p
+                qty += int(c.get('Quantity', 1) or 1)
             
-            for poi in res:
-                conns = poi.get('Connections', [])
-                max_pwr, qty = 0, 0
-                for c in conns:
-                    p = float(c.get('PowerKW', 0) or 0)
-                    if p > max_pwr: max_pwr = p
-                    qty += int(c.get('Quantity', 1) or 1)
-                
-                if max_pwr < min_power: continue
-                op_name = poi.get('OperatorInfo', {}).get('Title', "Unbekannt")
-                if hide_tesla and "tesla" in op_name.lower(): continue
-                
-                s_id = int(poi.get('StatusTypeID', 0) or 0)
-                s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
-                lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
-                
-                g_maps = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
-                a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
-                
-                pop_html = f'''<div style="width:200px; font-family:sans-serif; color:black;">
-                                <div style="margin-bottom:5px;"><b style="font-size:18px;">{int(max_pwr)} kW</b> <span style="background:#eee; padding:2px 6px; border-radius:10px; font-size:12px;">{qty} 🔌</span></div>
-                                <div style="font-size:12px; color:#666; margin-bottom:10px;">{op_name}</div>
-                                <div style="display:flex; gap:5px;">
-                                    <a href="{g_maps}" target="_blank" style="flex:1; background:#4285F4; color:white; padding:8px; text-decoration:none; border-radius:5px; text-align:center; font-size:12px; font-weight:bold;">Google</a>
-                                    <a href="{a_maps}" target="_blank" style="flex:1; background:black; color:white; padding:8px; text-decoration:none; border-radius:5px; text-align:center; font-size:12px; font-weight:bold;">Apple</a>
-                                </div></div>'''
-                
-                folium.Marker([lat, lon], icon=get_lightning_html(max_pwr, s_color), popup=folium.Popup(pop_html, max_width=250)).add_to(m)
-                found_count += 1
-        except: pass
+            if max_pwr < min_power: continue
+            op_name = poi.get('OperatorInfo', {}).get('Title', "Unbekannt")
+            if hide_tesla and "tesla" in op_name.lower(): continue
+            
+            s_id = int(poi.get('StatusTypeID', 0) or 0)
+            s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
+            lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
+            
+            g_maps = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
+            a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
+            
+            pop_html = f'''<div style="width:200px; font-family:sans-serif; color:black;">
+                            <div style="margin-bottom:5px;"><b style="font-size:18px;">{int(max_pwr)} kW</b> <span style="background:#eee; padding:2px 6px; border-radius:10px; font-size:12px;">{qty} 🔌</span></div>
+                            <div style="font-size:12px; color:#666; margin-bottom:10px;">{op_name}</div>
+                            <div style="display:flex; gap:5px;">
+                                <a href="{g_maps}" target="_blank" style="flex:1; background:#4285F4; color:white; padding:8px; text-decoration:none; border-radius:5px; text-align:center; font-size:12px; font-weight:bold;">Google</a>
+                                <a href="{a_maps}" target="_blank" style="flex:1; background:black; color:white; padding:8px; text-decoration:none; border-radius:5px; text-align:center; font-size:12px; font-weight:bold;">Apple</a>
+                            </div></div>'''
+            
+            folium.Marker([lat, lon], icon=get_lightning_html(max_pwr, s_color), popup=folium.Popup(pop_html, max_width=250)).add_to(m)
+            found_count += 1
+    except: pass
 
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_spinner", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_no_spinner", use_container_width=True)
