@@ -30,32 +30,37 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 def get_lightning_html(power_kw, status_color):
-    # KORRIGIERTE LOGIK FÜR DIE BLITZE
-    if power_kw < 201: 
-        color, count = "#3b82f6", 1 # Blau: bis 200kW
-    elif 201 <= power_kw < 350: 
-        color, count = "#ef4444", 2 # Rot: 201kW bis 349kW
-    else: 
-        color, count = "#000000", 3 # Schwarz: ab 350kW
+    # DEFINITIVE LOGIK FÜR DIE BLITZ-ANZAHL
+    # Kategorie 1: Alles ab 350 kW (3 schwarze Blitze)
+    if power_kw >= 350:
+        color, count = "#000000", 3
+    # Kategorie 2: Alles über 200 kW bis 349 kW (2 rote Blitze)
+    elif power_kw > 200:
+        color, count = "#ef4444", 2
+    # Kategorie 3: Alles andere (bis 200 kW) (1 blauer Blitz)
+    else:
+        color, count = "#3b82f6", 1
     
     glow = f"box-shadow: 0 0 10px {status_color}, 0 0 5px white;" if status_color != "#A9A9A9" else ""
+    # Erzeugt die entsprechende Anzahl an Blitzen
     icons = "".join([f'<i class="fa fa-bolt" style="color:{color}; margin: 0 1px;"></i>' for _ in range(count)])
     
     return DivIcon(
         html=f"""<div style="display: flex; flex-direction: column; align-items: center; width: 60px;">
                     <div style="background-color: {status_color}; border-radius: 50%; width: 14px; height: 14px; border: 2px solid white; {glow}"></div>
-                    <div style="font-size: 24px;">{icons}</div>
+                    <div style="font-size: 24px; display: flex; justify-content: center; width: 100%;">{icons}</div>
                  </div>""",
         icon_size=(60, 40), icon_anchor=(30, 20)
     )
 
-# --- STANDORT & SIDEBAR ---
+# --- STANDORT ---
 loc = get_geolocation()
 current_lat, current_lon = None, None
 if loc and loc.get('coords'):
     current_lat = loc['coords']['latitude']
     current_lon = loc['coords']['longitude']
 
+# --- SIDEBAR ---
 st.sidebar.title("🚀 Zielsuche")
 search_city = st.sidebar.text_input("Stadt eingeben", placeholder="z.B. München")
 
@@ -71,8 +76,6 @@ legende_html = f'''
     <div style="margin-top:10px;"><i class="fa fa-bolt" style="color:#3b82f6;"></i> 50-200 kW</div>
     <div style="margin-top:5px;"><i class="fa fa-bolt" style="color:#ef4444;"></i><i class="fa fa-bolt" style="color:#ef4444;"></i> 201-349 kW</div>
     <div style="margin-top:5px;"><i class="fa fa-bolt" style="color:#000;"></i><i class="fa fa-bolt" style="color:#000;"></i><i class="fa fa-bolt" style="color:#000;"></i> ≥350 kW</div>
-    <hr style="margin: 10px 0; border-color: #bbb;">
-    <strong>Status:</strong> <span style="color:#00FF00;">●</span> Frei | <span style="color:#FF0000;">●</span> Belegt
 </div>
 '''
 st.sidebar.markdown(legende_html, unsafe_allow_html=True)
@@ -84,10 +87,8 @@ soc = st.sidebar.slider("SOC (%)", 0, 100, 20)
 cons = st.sidebar.slider("Verbrauch", 10.0, 40.0, 20.0)
 range_km = int((battery * (soc / 100)) / cons * 100)
 
-# --- MAP ZENTRUM ---
-default_lat, default_lon = 50.1109, 8.6821 
-final_lat, final_lon = default_lat, default_lon
-
+# --- ZENTRUM ---
+final_lat, final_lon = 50.1109, 8.6821
 if search_city:
     try:
         r = requests.get(f"https://nominatim.openstreetmap.org/search?format=json&q={search_city}").json()
@@ -102,16 +103,13 @@ if current_lat:
     folium.Marker([current_lat, current_lon], icon=folium.Icon(color='blue', icon='user', prefix='fa')).add_to(m)
     folium.Circle([current_lat, current_lon], radius=range_km*1000, color="blue", fill=True, fill_opacity=0.05).add_to(m)
 
-# --- DATEN LADEN ---
+# --- DATEN ---
 found_count = 0
 if API_KEY:
     try:
         params = {
-            "key": API_KEY, 
-            "latitude": final_lat, "longitude": final_lon, 
-            "distance": range_km, "distanceunit": "KM",
-            "maxresults": 250, "compact": "false", "verbose": "false",
-            "connectiontypeid": "33,30"
+            "key": API_KEY, "latitude": final_lat, "longitude": final_lon, 
+            "distance": range_km, "distanceunit": "KM", "maxresults": 200, "compact": "false"
         }
         res = requests.get("https://api.openchargemap.io/v3/poi/", params=params).json()
         
@@ -131,14 +129,11 @@ if API_KEY:
             s_color = "#00FF00" if s_id in [10, 15, 50] else "#FF0000" if s_id in [20, 30, 75] else "#A9A9A9"
             lat, lon = poi['AddressInfo']['Latitude'], poi['AddressInfo']['Longitude']
             
-            g_maps = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
-            a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
-            
             pop_html = f'''<div style="width:180px; color:black; font-family:sans-serif;">
                 <b style="font-size:16px;">{int(max_pwr)} kW</b> ({qty} 🔌)<br>{op_name}<br>
                 <div style="display:flex; gap:5px; margin-top:10px;">
-                    <a href="{g_maps}" target="_blank" style="flex:1; background:#4285F4; color:white; padding:8px; text-decoration:none; border-radius:5px; text-align:center; font-size:12px; font-weight:bold;">Google</a>
-                    <a href="{a_maps}" target="_blank" style="flex:1; background:black; color:white; padding:8px; text-decoration:none; border-radius:5px; text-align:center; font-size:12px; font-weight:bold;">Apple</a>
+                    <a href="https://www.google.com/maps/dir/?api=1&destination={lat},{lon}" target="_blank" style="flex:1; background:#4285F4; color:white; padding:8px; text-decoration:none; border-radius:5px; text-align:center; font-size:12px; font-weight:bold;">Google</a>
+                    <a href="http://maps.apple.com/?daddr={lat},{lon}" target="_blank" style="flex:1; background:black; color:white; padding:8px; text-decoration:none; border-radius:5px; text-align:center; font-size:12px; font-weight:bold;">Apple</a>
                 </div>
             </div>'''
             
@@ -149,4 +144,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, use_container_width=True, key="restore_final")
+st_folium(m, height=800, width=None, use_container_width=True, key="final_fix_v2")
