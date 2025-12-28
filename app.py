@@ -184,10 +184,11 @@ if API_KEY:
             g_maps = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
             a_maps = f"http://maps.apple.com/?daddr={lat},{lon}"
             
-            # HIER GEÄNDERT: Betreiber-Titel und Technik-Zeile getauscht
-            pop_html = f'''<div style="width:200px;font-family:sans-serif;">
-                            <b style="font-size:14px;">{op_name}</b><br>
-                            <span style="font-size:12px;">{int(max_site_pwr)} kW | {total_chargers} Stecker</span><br><br>
+            # NEUE ANORDNUNG: Zeile 1 = Leistung, Zeile 2 = Betreiber
+            pop_html = f'''<div style="width:200px; font-family:sans-serif; color: black;">
+                            <b style="font-size:16px;">{int(max_site_pwr)} kW</b> 
+                            <span style="font-size:14px;">({total_chargers} Stecker)</span><br>
+                            <span style="font-size:12px; color: #666;">{op_name}</span><br><br>
                             <a href="{g_maps}" target="_blank" style="background:#4285F4;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;margin-bottom:8px;font-weight:bold;">Google Maps</a>
                             <a href="{a_maps}" target="_blank" style="background:black;color:white;padding:10px;text-decoration:none;border-radius:5px;display:block;text-align:center;font-weight:bold;">Apple Maps</a>
                            </div>'''
@@ -200,4 +201,4 @@ if API_KEY:
 if found_count > 0:
     st.markdown(f'<div class="found-badge">⚡ {found_count} Stationen</div>', unsafe_allow_html=True)
 
-st_folium(m, height=800, width=None, key="dc_final_v5", use_container_width=True)
+st_folium(m, height=800, width=None, key="dc_final_v7_popup_swap", use_container_width=True)
